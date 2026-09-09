@@ -1,0 +1,6 @@
+level,n_used,n_stations_eligible,seq_len,memory_lag_hours,horizon,median_acf_lag1,median_acf_lag24,median_acf_lag48,seq_len_rationale
+F1,1,18,48,30,24,0.8632,0.3887,0.2367,"Primer lag con ACF<0.3: 30 h; minimo operativo max(24, 24) h; candidato elegido: 48 h"
+F2,7,18,48,30,24,0.8632,0.3887,0.2367,"Primer lag con ACF<0.3: 30 h; minimo operativo max(24, 24) h; candidato elegido: 48 h"
+F3,13,18,48,30,24,0.8632,0.3887,0.2367,"Primer lag con ACF<0.3: 30 h; minimo operativo max(24, 24) h; candidato elegido: 48 h"
+F4,15,17,48,30,24,0.853,0.3858,0.2353,"Primer lag con ACF<0.3: 30 h; minimo operativo max(24, 24) h; candidato elegido: 48 h"
+F5,16,17,48,30,24,0.853,0.3858,0.2353,"Primer lag con ACF<0.3: 30 h; minimo operativo max(24, 24) h; candidato elegido: 48 h"

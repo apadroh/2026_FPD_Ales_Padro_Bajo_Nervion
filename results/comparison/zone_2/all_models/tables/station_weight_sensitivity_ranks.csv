@@ -1,0 +1,5 @@
+model_label,difficulty,equal,inv_difficulty,tertile_equal
+AirFormer,1.0,1.0,1.0,1.0
+GAT-Informer,4.0,4.0,4.0,4.0
+Informer2020,3.0,3.0,3.0,3.0
+XGBoost,2.0,2.0,2.0,2.0

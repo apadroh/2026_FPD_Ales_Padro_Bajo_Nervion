@@ -1,0 +1,6 @@
+level,description,n_requested,n_used,features_used,features_excluded
+F1,Autorregresiva (solo target),1,1,PM10,
+F2,Target + variables temporales,7,7,hour_sin; hour_cos; dow_sin; month_sin; dow_cos; month_cos; PM10,
+F3,F2 + meteorologia,13,13,hour_sin; dow_sin; hour_cos; dow_cos; month_sin; wind_cos; month_cos; VV; wind_sin; H; T; PR; PM10,
+F4,F3 + otros contaminantes,17,15,hour_sin; wind_cos; hour_cos; dow_sin; dow_cos; month_sin; month_cos; VV; wind_sin; H; T; PR; PM10; NOx; NO2,PM25; SO2
+F5,F4 + intrusion sahariana (Sah),18,16,hour_sin; hour_cos; T; dow_sin; dow_cos; month_sin; month_cos; VV; wind_sin; wind_cos; PR; H; Sah; PM10; NOx; NO2,PM25; SO2

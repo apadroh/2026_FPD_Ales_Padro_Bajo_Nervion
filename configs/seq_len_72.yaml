@@ -1,0 +1,6 @@
+# Override look-back for sensitivity run
+study_area: Bajo Nervión
+seq_len: 72
+horizon: 24
+zone: 2
+contaminant: PM10

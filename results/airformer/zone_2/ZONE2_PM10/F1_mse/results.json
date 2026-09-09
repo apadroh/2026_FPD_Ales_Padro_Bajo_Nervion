@@ -1,0 +1,195 @@
+{
+  "model": "airformer",
+  "dataset": "ZONE2_PM10",
+  "zone": 2,
+  "feature_config": "F1",
+  "input_dim": 1,
+  "seq_len": 48,
+  "horizon": 24,
+  "num_nodes": 18,
+  "stations": [
+    "ABANTO",
+    "ALGORTA (BBIZI2)",
+    "ALONSOTEGI",
+    "ARRAIZ (Monte)",
+    "BARAKALDO",
+    "BASAURI",
+    "CASTREJANA",
+    "ERANDIO",
+    "EUROPA",
+    "LAS CARRERAS",
+    "MAZARREDO",
+    "MUSKIZ",
+    "M\u00aa DIAZ HARO",
+    "SAN JULIAN",
+    "SAN MIGUEL",
+    "SANGRONIZ",
+    "SANTURCE",
+    "ZIERBENA (Puerto)"
+  ],
+  "forecast_design": {
+    "at_hour_h": "model outputs hours h+1 ... h+horizon for all nodes",
+    "ma24": "mean(pred[h+1], ..., pred[h+24]) when horizon=24"
+  },
+  "stochastic_flag": "False",
+  "spatial_flag": "True",
+  "dartboard": 4,
+  "results_tag": "_mse",
+  "train_loss": "mse",
+  "peak_weight": {
+    "alpha": 0.0,
+    "thr": 40.0,
+    "thr2": 80.0,
+    "asym_beta": 0.0
+  },
+  "test_metrics_raw": {
+    "hourly": {
+      "mae": 6.501254081726074,
+      "mse": 98.27485656738281,
+      "rmse": 9.91336727142334,
+      "mape": 0.683192253112793
+    },
+    "ma24": {
+      "mae": 4.483942985534668,
+      "mse": 44.82006072998047,
+      "rmse": 6.6947784423828125,
+      "mape": 0.4134114682674408,
+      "definition": "mean of the 24 hourly forecasts (h+1 ... h+24)"
+    }
+  },
+  "per_station": [
+    {
+      "station": "ABANTO",
+      "hourly_mae": 4.9234232902526855,
+      "hourly_rmse": 7.3509063720703125,
+      "ma24_mae": 3.3211917877197266,
+      "ma24_rmse": 4.713442325592041
+    },
+    {
+      "station": "ALGORTA (BBIZI2)",
+      "hourly_mae": 8.72087574005127,
+      "hourly_rmse": 13.017068862915039,
+      "ma24_mae": 5.406245708465576,
+      "ma24_rmse": 7.82248067855835
+    },
+    {
+      "station": "ALONSOTEGI",
+      "hourly_mae": 6.486682415008545,
+      "hourly_rmse": 9.289839744567871,
+      "ma24_mae": 4.558626174926758,
+      "ma24_rmse": 6.705128192901611
+    },
+    {
+      "station": "ARRAIZ (Monte)",
+      "hourly_mae": 5.540324687957764,
+      "hourly_rmse": 8.515007019042969,
+      "ma24_mae": 4.215867519378662,
+      "ma24_rmse": 6.23181676864624
+    },
+    {
+      "station": "BARAKALDO",
+      "hourly_mae": 7.489865779876709,
+      "hourly_rmse": 10.828824996948242,
+      "ma24_mae": 5.187852382659912,
+      "ma24_rmse": 7.335783958435059
+    },
+    {
+      "station": "BASAURI",
+      "hourly_mae": 6.954836368560791,
+      "hourly_rmse": 11.149808883666992,
+      "ma24_mae": 4.814817905426025,
+      "ma24_rmse": 7.006871700286865
+    },
+    {
+      "station": "CASTREJANA",
+      "hourly_mae": 7.212549209594727,
+      "hourly_rmse": 10.235441207885742,
+      "ma24_mae": 4.701951503753662,
+      "ma24_rmse": 6.904459476470947
+    },
+    {
+      "station": "ERANDIO",
+      "hourly_mae": 6.423621654510498,
+      "hourly_rmse": 9.719440460205078,
+      "ma24_mae": 4.372140884399414,
+      "ma24_rmse": 6.255490303039551
+    },
+    {
+      "station": "EUROPA",
+      "hourly_mae": 5.782894134521484,
+      "hourly_rmse": 8.972169876098633,
+      "ma24_mae": 4.009777069091797,
+      "ma24_rmse": 5.975039482116699
+    },
+    {
+      "station": "LAS CARRERAS",
+      "hourly_mae": 6.0660834312438965,
+      "hourly_rmse": 9.042535781860352,
+      "ma24_mae": 4.100037097930908,
+      "ma24_rmse": 5.800083637237549
+    },
+    {
+      "station": "MAZARREDO",
+      "hourly_mae": 5.144458770751953,
+      "hourly_rmse": 8.0960054397583,
+      "ma24_mae": 3.606673240661621,
+      "ma24_rmse": 5.619311809539795
+    },
+    {
+      "station": "MUSKIZ",
+      "hourly_mae": 4.42948055267334,
+      "hourly_rmse": 7.613463401794434,
+      "ma24_mae": 3.2844998836517334,
+      "ma24_rmse": 5.263270854949951
+    },
+    {
+      "station": "M\u00aa DIAZ HARO",
+      "hourly_mae": 5.9845709800720215,
+      "hourly_rmse": 9.315536499023438,
+      "ma24_mae": 4.466196060180664,
+      "ma24_rmse": 7.041324615478516
+    },
+    {
+      "station": "SAN JULIAN",
+      "hourly_mae": 6.562060356140137,
+      "hourly_rmse": 10.053638458251953,
+      "ma24_mae": 4.25339937210083,
+      "ma24_rmse": 6.333190441131592
+    },
+    {
+      "station": "SAN MIGUEL",
+      "hourly_mae": 7.18609619140625,
+      "hourly_rmse": 9.762096405029297,
+      "ma24_mae": 6.093994617462158,
+      "ma24_rmse": 8.843819618225098
+    },
+    {
+      "station": "SANGRONIZ",
+      "hourly_mae": 6.284114360809326,
+      "hourly_rmse": 9.472555160522461,
+      "ma24_mae": 3.8699257373809814,
+      "ma24_rmse": 5.609893321990967
+    },
+    {
+      "station": "SANTURCE",
+      "hourly_mae": 7.594497203826904,
+      "hourly_rmse": 10.578108787536621,
+      "ma24_mae": 5.595866680145264,
+      "ma24_rmse": 8.546869277954102
+    },
+    {
+      "station": "ZIERBENA (Puerto)",
+      "hourly_mae": 8.236102104187012,
+      "hourly_rmse": 13.239744186401367,
+      "ma24_mae": 4.851905345916748,
+      "ma24_rmse": 6.9859113693237305
+    }
+  ],
+  "artifacts": {
+    "test_preds_hourly": "/global/home/TRI.LAN/ales.padro/MASTER/results/airformer/zone_2/ZONE2_PM10/F1_mse/test_preds_hourly.npy",
+    "test_trues_hourly": "/global/home/TRI.LAN/ales.padro/MASTER/results/airformer/zone_2/ZONE2_PM10/F1_mse/test_trues_hourly.npy",
+    "test_preds_ma24": "/global/home/TRI.LAN/ales.padro/MASTER/results/airformer/zone_2/ZONE2_PM10/F1_mse/test_preds_ma24.npy",
+    "test_trues_ma24": "/global/home/TRI.LAN/ales.padro/MASTER/results/airformer/zone_2/ZONE2_PM10/F1_mse/test_trues_ma24.npy",
+    "checkpoint_dir": "/global/home/TRI.LAN/ales.padro/MASTER/results/airformer/zone_2/ZONE2_PM10/F1_mse/logs"
+  }
+}

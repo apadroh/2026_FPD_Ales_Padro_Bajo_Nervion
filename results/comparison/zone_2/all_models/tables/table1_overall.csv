@@ -1,0 +1,7 @@
+feature_config,description,model,model_label,n_stations,hourly_mae,hourly_rmse,ma24_mae,ma24_rmse
+F5,F4 + Sah_int + episode memory (lags/dur/max3); no binary Sah,xgboost,XGBoost,18,6.094203437465615,9.020324574716312,3.976417491213228,5.44778840987245
+F5,F4 + Sah_int + episode memory (lags/dur/max3); no binary Sah,airformer,AirFormer,18,6.008306662241618,9.084200037850273,3.9867225090662637,5.64766173892551
+F1,Autoregressive (target only),informer,Informer2020,18,6.253935739928002,9.522107522373142,4.222916739434563,6.057272071419063
+F2,Target + temporal features,gat_informer,GAT-Informer,18,6.058857096566094,9.545709292093912,4.091784742143419,6.096808711687724
+baseline,baseline,persistence_last,Persistence (last),18,7.093271013192099,11.514164971019865,5.539636597884676,8.794281713022086
+baseline,baseline,persistence_ma24,Persistence (MA24),18,6.733551946028624,10.366939081208223,4.816815420050625,7.2035369932072415

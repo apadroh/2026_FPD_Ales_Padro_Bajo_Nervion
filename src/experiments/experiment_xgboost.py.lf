@@ -1,0 +1,397 @@
+"""
+XGBoost baseline under the same protocol as Informer2020.
+
+- Data: exported Informer CSVs (zone / station / F*)
+- Windows: seq_len=48 → pred_len=24 (same borders 70/10/20)
+- Target: 24 h PM10 vector; MA24 = mean of those 24 preds
+- Model: one XGBRegressor per station × F* (local, like Informer)
+- HPO: Optuna on validation MA24 RMSE
+
+Usage:
+  python src/experiments/experiment_xgboost.py --zone 2 --feature-configs F1 --stations ABANTO --n-trials 5
+  python src/experiments/experiment_xgboost.py --zone 2 --feature-configs F1 F2 F3 F4 F5 --n-trials 30
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+import time
+import warnings
+from pathlib import Path
+
+import numpy as np
+import optuna
+import pandas as pd
+from sklearn.multioutput import MultiOutputRegressor
+
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from src.data.air_quality_dataset import AirQualityDataset
+from src.data.feature_configs import (
+    ABLATION_LEVELS,
+    ALL_FEATURE_LEVELS,
+    LEVEL_DESCRIPTIONS,
+)
+from src.models.informer2020.metrics import metric_hourly_and_ma24
+from src.utils.paths import informer2020_station_dir, seq_len_tag
+
+optuna.logging.set_verbosity(optuna.logging.WARNING)
+warnings.filterwarnings("ignore", category=UserWarning)
+
+
+def parse_args() -> argparse.Namespace:
+    p = argparse.ArgumentParser(description="XGBoost F1–F5 + Optuna HPO")
+    p.add_argument("--zone", type=int, default=2)
+    p.add_argument("--target", default="PM10")
+    p.add_argument("--seq-len", type=int, default=48)
+    p.add_argument("--label-len", type=int, default=24)
+    p.add_argument("--pred-len", type=int, default=24)
+    p.add_argument(
+        "--feature-configs",
+        nargs="+",
+        default=list(ABLATION_LEVELS),
+        choices=ALL_FEATURE_LEVELS,
+    )
+    p.add_argument(
+        "--stations",
+        nargs="*",
+        default=None,
+        help="Station folder names; default = all with data.csv for each F",
+    )
+    p.add_argument("--n-trials", type=int, default=30, help="Optuna trials per station×F")
+    p.add_argument("--seed", type=int, default=42)
+    p.add_argument(
+        "--results-root",
+        default="results/xgboost",
+        help="Output root (results/xgboost/zone_Z/...)",
+    )
+    p.add_argument(
+        "--skip-existing",
+        action="store_true",
+        help="Skip station×F if results.json already exists",
+    )
+    p.add_argument(
+        "--max-estimators",
+        type=int,
+        default=800,
+        help="Upper bound n_estimators in HPO / final fit",
+    )
+    return p.parse_args()
+
+
+def discover_stations(zone: int, feature_config: str) -> list[str]:
+    base = ROOT / "data" / "training" / f"zone_{zone}" / "informer2020"
+    if not base.exists():
+        return []
+    out = []
+    for d in sorted(base.iterdir()):
+        if d.is_dir() and (d / feature_config / "data.csv").exists():
+            out.append(d.name)
+    return out
+
+
+def _matrix_from_dataset(ds: AirQualityDataset, pred_len: int) -> tuple[np.ndarray, np.ndarray]:
+    """Flatten history windows → X; future PM10 → Y (n, pred_len)."""
+    xs, ys = [], []
+    for i in range(len(ds)):
+        seq_x, seq_y, _, _ = ds[i]
+        x = seq_x.numpy() if hasattr(seq_x, "numpy") else np.asarray(seq_x)
+        y = seq_y.numpy() if hasattr(seq_y, "numpy") else np.asarray(seq_y)
+        xs.append(x.reshape(-1).astype(np.float64))
+        ys.append(y[-pred_len:, -1].astype(np.float64))
+    return np.stack(xs), np.stack(ys)
+
+
+def load_splits(
+    data_dir: Path,
+    *,
+    target: str,
+    seq_len: int,
+    label_len: int,
+    pred_len: int,
+) -> dict[str, tuple[np.ndarray, np.ndarray]]:
+    """Raw-unit tabular splits (scale=False; trees prefer original units)."""
+    size = (seq_len, label_len, pred_len)
+    out = {}
+    for flag in ("train", "val", "test"):
+        ds = AirQualityDataset(
+            root_path=data_dir,
+            flag=flag,
+            size=size,
+            features="MS",
+            target=target,
+            scale=False,
+            timeenc=1,
+            freq="h",
+        )
+        if len(ds) == 0:
+            raise RuntimeError(f"Empty {flag} split under {data_dir}")
+        out[flag] = _matrix_from_dataset(ds, pred_len)
+    return out
+
+
+def ma24_rmse(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    true_ma = y_true.mean(axis=1)
+    pred_ma = y_pred.mean(axis=1)
+    return float(np.sqrt(np.mean((pred_ma - true_ma) ** 2)))
+
+
+def make_xgb(**params):
+    import xgboost as xgb
+
+    return xgb.XGBRegressor(
+        objective="reg:squarederror",
+        tree_method="hist",
+        n_jobs=2,
+        random_state=params.pop("random_state", 42),
+        **params,
+    )
+
+
+def fit_multioutput(base_params: dict, X_tr, Y_tr, X_va, Y_va, early_stopping: int = 40):
+    """One XGB per horizon (stable across xgboost versions)."""
+    params = dict(base_params)
+    # MultiOutputRegressor does not forward eval_set early stopping cleanly;
+    # use a fixed n_estimators from HPO (already tuned with ES on MA24 proxy).
+    model = MultiOutputRegressor(make_xgb(**params), n_jobs=1)
+    model.fit(X_tr, Y_tr)
+    return model
+
+
+def hpo_best_params(
+    X_tr,
+    Y_tr,
+    X_va,
+    Y_va,
+    *,
+    n_trials: int,
+    seed: int,
+    max_estimators: int,
+) -> tuple[dict, float]:
+    """
+    Tune on a MA24 proxy model (predict mean of 24 h) for speed,
+    then reuse params for the 24-horizon MultiOutputRegressor.
+    """
+
+    y_tr_ma = Y_tr.mean(axis=1)
+    y_va_ma = Y_va.mean(axis=1)
+
+    def objective(trial: optuna.Trial) -> float:
+        params = {
+            "n_estimators": trial.suggest_int("n_estimators", 100, max_estimators),
+            "max_depth": trial.suggest_int("max_depth", 3, 10),
+            "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.25, log=True),
+            "min_child_weight": trial.suggest_float("min_child_weight", 1.0, 20.0, log=True),
+            "subsample": trial.suggest_float("subsample", 0.6, 1.0),
+            "colsample_bytree": trial.suggest_float("colsample_bytree", 0.5, 1.0),
+            "reg_lambda": trial.suggest_float("reg_lambda", 1e-2, 20.0, log=True),
+            "reg_alpha": trial.suggest_float("reg_alpha", 1e-3, 5.0, log=True),
+            "gamma": trial.suggest_float("gamma", 1e-4, 5.0, log=True),
+            "random_state": seed,
+        }
+        model = make_xgb(**params)
+        model.fit(
+            X_tr,
+            y_tr_ma,
+            eval_set=[(X_va, y_va_ma)],
+            verbose=False,
+        )
+        # Prefer best_iteration when available
+        pred = model.predict(X_va)
+        return float(np.sqrt(np.mean((pred - y_va_ma) ** 2)))
+
+    study = optuna.create_study(
+        direction="minimize",
+        sampler=optuna.samplers.TPESampler(seed=seed),
+    )
+    study.optimize(objective, n_trials=n_trials, show_progress_bar=False)
+    best = dict(study.best_params)
+    best["random_state"] = seed
+    return best, float(study.best_value)
+
+
+def evaluate_model(model, X, Y) -> tuple[dict, np.ndarray, np.ndarray]:
+    pred = np.asarray(model.predict(X), dtype=np.float64)
+    true = np.asarray(Y, dtype=np.float64)
+    # shapes (n, 24) → add channel dim for metric helper
+    m = metric_hourly_and_ma24(pred[..., None], true[..., None])
+    return m, pred, true
+
+
+def run_station_config(
+    station: str,
+    feature_config: str,
+    *,
+    zone: int,
+    target: str,
+    seq_len: int,
+    label_len: int,
+    pred_len: int,
+    n_trials: int,
+    seed: int,
+    max_estimators: int,
+    results_zone_dir: Path,
+) -> dict:
+    data_dir = informer2020_station_dir(zone, station, feature_config)
+    if not (data_dir / "data.csv").exists():
+        raise FileNotFoundError(data_dir / "data.csv")
+
+    splits = load_splits(
+        data_dir,
+        target=target,
+        seq_len=seq_len,
+        label_len=label_len,
+        pred_len=pred_len,
+    )
+    X_tr, Y_tr = splits["train"]
+    X_va, Y_va = splits["val"]
+    X_te, Y_te = splits["test"]
+
+    t0 = time.time()
+    best_params, best_val_ma24 = hpo_best_params(
+        X_tr,
+        Y_tr,
+        X_va,
+        Y_va,
+        n_trials=n_trials,
+        seed=seed,
+        max_estimators=max_estimators,
+    )
+    model = fit_multioutput(best_params, X_tr, Y_tr, X_va, Y_va)
+    m_val, _, _ = evaluate_model(model, X_va, Y_va)
+    m_te, pred_te, true_te = evaluate_model(model, X_te, Y_te)
+    elapsed = time.time() - t0
+
+    out_dir = results_zone_dir / station / feature_config
+    out_dir.mkdir(parents=True, exist_ok=True)
+    np.save(out_dir / "test_preds_hourly.npy", pred_te)
+    np.save(out_dir / "test_trues_hourly.npy", true_te)
+    np.save(out_dir / "test_preds_ma24.npy", pred_te.mean(axis=1))
+    np.save(out_dir / "test_trues_ma24.npy", true_te.mean(axis=1))
+
+    payload = {
+        "station": station,
+        "zone": zone,
+        "contaminant": target,
+        "feature_config": feature_config,
+        "model": "xgboost",
+        "description": LEVEL_DESCRIPTIONS.get(feature_config, ""),
+        "seq_len": seq_len,
+        "label_len": label_len,
+        "pred_len": pred_len,
+        "n_features_flat": int(X_tr.shape[1]),
+        "n_train": int(len(X_tr)),
+        "n_val": int(len(X_va)),
+        "n_test": int(len(X_te)),
+        "hpo": {
+            "n_trials": n_trials,
+            "best_params": best_params,
+            "best_val_ma24_rmse_proxy": best_val_ma24,
+            "proxy": "Optuna tunes a single XGB on MA24 target; final model is MultiOutput 24h",
+        },
+        "val_metrics_raw": m_val,
+        "test_metrics_raw": m_te,
+        "elapsed_s": elapsed,
+        "artifacts": {
+            "test_preds_hourly": str(out_dir / "test_preds_hourly.npy"),
+            "test_trues_hourly": str(out_dir / "test_trues_hourly.npy"),
+            "test_preds_ma24": str(out_dir / "test_preds_ma24.npy"),
+            "test_trues_ma24": str(out_dir / "test_trues_ma24.npy"),
+        },
+    }
+    (out_dir / "results.json").write_text(
+        json.dumps(payload, indent=2), encoding="utf-8"
+    )
+    return payload
+
+
+def write_batch_summaries(zone_dir: Path, configs: list[str]) -> None:
+    for cfg in configs:
+        rows = []
+        for st_dir in sorted(zone_dir.iterdir()):
+            if not st_dir.is_dir() or st_dir.name == "comparison":
+                continue
+            if st_dir.name.startswith("seq_len_"):
+                continue
+            meta = st_dir / cfg / "results.json"
+            if not meta.exists():
+                continue
+            data = json.loads(meta.read_text(encoding="utf-8"))
+            raw = data.get("test_metrics_raw") or {}
+            hourly = raw.get("hourly") or {}
+            ma24 = raw.get("ma24") or {}
+            rows.append(
+                {
+                    "station": data.get("station", st_dir.name),
+                    "status": "ok",
+                    "hourly_mae": hourly.get("mae"),
+                    "hourly_rmse": hourly.get("rmse"),
+                    "ma24_mae": ma24.get("mae"),
+                    "ma24_rmse": ma24.get("rmse"),
+                    "elapsed_s": data.get("elapsed_s", ""),
+                    "error": "",
+                }
+            )
+        if not rows:
+            continue
+        out = zone_dir / f"batch_summary_{cfg}.csv"
+        pd.DataFrame(rows).to_csv(out, index=False)
+        print(f"Wrote {out} ({len(rows)} stations)")
+
+
+def main() -> None:
+    args = parse_args()
+    results_root = ROOT / args.results_root
+    zone_dir = results_root / f"zone_{args.zone}"
+    tag = seq_len_tag(args.seq_len)
+    if tag:
+        zone_dir = zone_dir / tag
+    zone_dir.mkdir(parents=True, exist_ok=True)
+
+    for cfg in args.feature_configs:
+        stations = args.stations or discover_stations(args.zone, cfg)
+        if not stations:
+            print(f"[{cfg}] no stations found")
+            continue
+        print(
+            f"\n=== {cfg}: {len(stations)} stations · seq_len={args.seq_len} · "
+            f"trials={args.n_trials} ==="
+        )
+        for st in stations:
+            out_json = zone_dir / st / cfg / "results.json"
+            if args.skip_existing and out_json.exists():
+                print(f"  skip {st}/{cfg} (exists)")
+                continue
+            print(f"  XGB | {st} | {cfg}", flush=True)
+            try:
+                res = run_station_config(
+                    st,
+                    cfg,
+                    zone=args.zone,
+                    target=args.target,
+                    seq_len=args.seq_len,
+                    label_len=args.label_len,
+                    pred_len=args.pred_len,
+                    n_trials=args.n_trials,
+                    seed=args.seed,
+                    max_estimators=args.max_estimators,
+                    results_zone_dir=zone_dir,
+                )
+                te = res["test_metrics_raw"]["ma24"]
+                print(
+                    f"    MA24 RMSE={te['rmse']:.4f} MAE={te['mae']:.4f} "
+                    f"({res['elapsed_s']:.1f}s)"
+                )
+            except Exception as exc:  # noqa: BLE001
+                print(f"    FAIL {st}/{cfg}: {exc}")
+
+    write_batch_summaries(zone_dir, args.feature_configs)
+    print("\nDone. Summaries under", zone_dir)
+
+
+if __name__ == "__main__":
+    main()

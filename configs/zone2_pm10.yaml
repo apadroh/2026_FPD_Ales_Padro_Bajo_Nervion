@@ -1,0 +1,27 @@
+# Bajo Nervión PM10 TFM protocol
+study_area: Bajo Nervión
+zone: 2
+contaminant: PM10
+n_stations: 18
+horizon: 24
+train_ratio: 0.70
+val_ratio: 0.10
+test_ratio: 0.20
+primary_metric: ma24_rmse
+ranking: equal_station_mean
+
+# Official look-back (ACF) + sensitivity grid
+seq_len_official: 48
+seq_len_grid: [24, 48, 72, 96]
+
+feature_packs_official: [F1, F2, F3, F4, F5]
+feature_packs_peak_extras: [F3I, F3IL, F3IL_pw, F5I]
+
+models:
+  - informer2020
+  - gat_informer
+  - airformer
+  - xgboost
+
+seeds:
+  default: 2024

@@ -1,0 +1,34 @@
+{
+  "dataset": "C:/Users/105116/MASTER/data/training/zone_2/dataset_zone_2_PM10.csv",
+  "target_col": "PM10",
+  "start_date": "2019-01-01",
+  "recommended_seq_len": 48,
+  "memory_lag_hours": 30,
+  "acf_threshold": 0.3,
+  "horizon": 24,
+  "min_seq_len": 24,
+  "lower_bound_hours": 30,
+  "candidates": [
+    12,
+    24,
+    48,
+    72,
+    96,
+    168
+  ],
+  "acf_at_key_lags": {
+    "1": 0.863187252417136,
+    "6": 0.5765140985520891,
+    "12": 0.4385877354489058,
+    "24": 0.38870663132137473,
+    "48": 0.23666005248297933,
+    "72": 0.1775567625963055,
+    "96": 0.15453855922587695,
+    "120": 0.13549189861368566,
+    "168": 0.11567445006030057
+  },
+  "rationale": "Primer lag con ACF<0.3: 30 h; minimo operativo max(24, 24) h; candidato elegido: 48 h",
+  "n_stations": 18,
+  "median_acf_lag1": 0.8632,
+  "median_acf_lag24": 0.3887
+}

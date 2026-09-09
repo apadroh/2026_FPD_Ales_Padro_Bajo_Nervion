@@ -1,0 +1,3 @@
+kind,n_episodes,dur_min,dur_median,dur_max
+zone_mean_episodes_ge80,15,1,5.0,25
+zone_mean_episodes_40_80,170,1,3.0,59

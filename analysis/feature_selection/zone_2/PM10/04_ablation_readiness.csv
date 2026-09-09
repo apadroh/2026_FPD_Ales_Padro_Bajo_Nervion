@@ -1,0 +1,6 @@
+level,description,n_requested,n_used,features_used,features_excluded
+F1,Autoregressive (target only),1,1,PM10,
+F2,Target + time features,7,7,PM10; hour_sin; hour_cos; dow_sin; dow_cos; month_sin; month_cos,
+F3,F2 + meteorology,13,13,PM10; hour_sin; hour_cos; dow_sin; dow_cos; month_sin; month_cos; VV; wind_sin; wind_cos; T; H; PR,
+F4,F3 + other pollutants,17,15,PM10; hour_sin; hour_cos; dow_sin; dow_cos; month_sin; month_cos; VV; wind_sin; wind_cos; T; H; PR; NO2; NOx,PM25(53.9%); SO2(72.1%)
+F5,F4 + Saharan dust (Sah),18,16,PM10; hour_sin; hour_cos; dow_sin; dow_cos; month_sin; month_cos; VV; wind_sin; wind_cos; T; H; PR; NO2; NOx; Sah,PM25(53.9%); SO2(72.1%)

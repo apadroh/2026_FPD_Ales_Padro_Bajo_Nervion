@@ -1,0 +1,7 @@
+strategy,model,model_label,feature_config,n_stations,eval_rmse,vs_best_single_delta,vs_oracle_delta
+oracle_on_eval_half,oracle,Oracle (chooses using 2nd half),mixed,18,4.932171213155635,-0.2959103037528079,0.0
+single_model_best_F,xgboost,XGBoost,F5I,18,5.228081516908443,0.0,0.2959103037528079
+select_on_first_half,router_val_proxy,"Realistic selector (choose on 1st half, eval on 2nd)",mixed,18,5.236021289720037,0.0079397728115946,0.3038500765644025
+single_model_best_F,airformer,AirFormer,F3IL,18,5.272535582725485,0.0444540658170424,0.3403643695698504
+single_model_best_F,gat_informer,GAT-Informer,F2,18,5.336137070408444,0.1080555535000016,0.4039658572528095
+single_model_best_F,informer,Informer2020,F1,17,5.637548317270453,0.4094668003620105,0.7053771041148185

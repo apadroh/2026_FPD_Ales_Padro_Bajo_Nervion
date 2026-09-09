@@ -1,0 +1,13 @@
+{
+  "best_model": "xgboost",
+  "best_config": "F5",
+  "ma24_rmse": 5.44778840987245,
+  "models_available": [
+    "informer",
+    "airformer",
+    "gat_informer",
+    "xgboost",
+    "persistence_last",
+    "persistence_ma24"
+  ]
+}

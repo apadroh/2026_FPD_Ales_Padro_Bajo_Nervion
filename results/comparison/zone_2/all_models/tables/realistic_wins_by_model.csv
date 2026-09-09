@@ -1,0 +1,7 @@
+sel_model,sel_config,n_stations_chosen,model_label
+xgboost,F3I,5,XGBoost
+airformer,F3I,4,AirFormer
+airformer,F3IL,4,AirFormer
+xgboost,F5,3,XGBoost
+xgboost,F1,1,XGBoost
+airformer,F5I,1,AirFormer

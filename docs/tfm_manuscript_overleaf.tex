@@ -1,0 +1,673 @@
+% =============================================================================
+% TFM manuscript (from Overleaf) ? local working copy (definitive prose)
+% Compile from docs/ (or set TEXINPUTS). Figures: see \graphicspath.
+% =============================================================================
+\documentclass[11pt]{article}
+
+% -------------------------
+% PACKAGES
+% -------------------------
+\usepackage[
+a4paper,
+left=2cm,
+right=2cm,
+top=2.3cm,
+bottom=2.3cm
+]{geometry}
+\usepackage{times}
+\usepackage{graphicx}
+\usepackage{wrapfig}
+\usepackage{float}
+\usepackage{amsmath, amssymb}
+\usepackage{booktabs}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{hyperref}
+\usepackage{setspace}
+\usepackage{xcolor}
+\usepackage{titlesec}
+\usepackage{titling}
+\usepackage{enumitem}
+\usepackage{multicol}
+
+\bibliographystyle{elsarticle-num}
+
+% Revised text: \rev = integrated (no colour); \revnew = latest edits (highlighted)
+\newcommand{\rev}[1]{#1}
+\newcommand{\revnew}[1]{\textcolor{orange!75!black}{#1}}
+\newenvironment{revnewblock}{%
+  \begingroup\color{orange!75!black}%
+}{%
+  \endgroup%
+}
+
+
+
+\titlespacing*{\section}{0pt}{1.2ex}{0.6ex}
+\setlength{\droptitle}{-2cm}
+
+\pretitle{\begin{center}\LARGE\bfseries}
+\posttitle{\par\end{center}\vspace{-0.8em}}
+\preauthor{\begin{center}\normalsize}
+\postauthor{\par\end{center}\vspace{-0.8em}}
+\predate{}
+\postdate{}
+
+% Figures: Overleaf used imagen/; local repo has docs/figures_print and comparison figures.
+\graphicspath{%
+  {imagen/}%
+  {figures_print/}%
+  {../results/comparison/zone_2/all_models/figures/}%
+  {../results/comparison/zone_2/all_models/figures/pm10graph/}%
+  {../results/comparison/zone_2/all_models/figures/pred_vs_real/}%
+}
+
+\title{\textbf{Evaluation of Spatial Representation Strategies in Transformer Architectures for PM$_{10}$ Forecasting to Support Air Pollution Episode Management: A Case Study in Bajo Nervi?n}\\[0.4em]}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.35em}
+\setlength{\textfloatsep}{7pt plus 2pt minus 2pt}
+\setlength{\floatsep}{7pt plus 2pt minus 2pt}
+
+\author{
+\normalsize
+Student: Ales Padr?\\
+Supervisor: Javier del Ser\\
+2026
+}
+\date{}
+
+\begin{document}
+\maketitle
+\vspace{-0.5em}
+
+% -------------------------
+\section{Abstract}
+\label{sec:abstract}
+
+\rev{This work compares three Transformer-based spatial representation strategies for hourly PM$_{10}$ forecasting in the Basque Country (\textit{Bajo Nervi\'on}; $N{=}18$ stations) under a shared protocol: look-back $L{=}48$\,h (selected via ACF and confirmed by a $L\in\{24,48,72,96\}$ sensitivity analysis), horizon $H{=}24$\,h, chronological 70/10/20 split, and equal station-mean ranking by MA24 RMSE. Informer, GAT-Informer and AirFormer are evaluated across cumulative feature packs F1--F5 (F5 adds Saharan \emph{intensity} and episode memory), with \textbf{XGBoost} as a strong non-Transformer tabular baseline. \textbf{Two complementary rankings emerge.} On the \emph{official} F1--F5 ladder, \textbf{XGBoost F5} achieves the best global MA24 RMSE ($\approx$5.45; $\approx$+24\% skill versus MA24 persistence), ahead of AirFormer F5 ($\approx$5.65), Informer F1 ($\approx$6.06) and GAT-Informer F2 ($\approx$6.10). For the spatial contrast (H1--H2), dynamic spatial attention (\textbf{AirFormer F5}, $\approx$5.65; F3 marks the meteo-driven jump at $\approx$5.70) still beats the temporal baseline at most stations, whereas a fixed PM$_{10}$ graph (GAT-Informer) does not. \emph{Peak-oriented extensions} outside the ladder---AirFormer F3IL and XGBoost F5I---reach a similar global MA24 ($\approx$5.42), marginally improving on official XGBoost F5 while cutting high-PM$_{10}$ errors (80+ bin $\approx$94$\to$$\approx$80--83). A matched F3IL check (meteo+Saharan memory, no co-pollutants) favours AirFormer (5.42) over XGBoost (5.54), whereas F5 favours XGBoost (5.45) over AirFormer (5.65)---so each architecture peaks with a different feature recipe. Oracle/realistic routing analyses support deploying a single zone-level strong model rather than per-station selection.}
+\revnew{Yet even peak-oriented packs leave large absolute error in the rare 80+~\textmu g\,m$^{-3}$ regime (pooled hourly RMSE $\approx$80), limiting stand-alone operational deployment for extreme-episode decisions without expert oversight and forecast Saharan transport.}
+
+\noindent\revnew{\textit{Leyenda de revisión:} texto en \textbf{negro} = borrador base (PDF 21\,pp); texto en \textbf{naranja} = cambios de esta sesión (restauraciones, recortes o respuestas H1--H4).}
+
+%---------------------------------------------------------
+\section{Introduction}
+\label{sec:introduction}
+
+\begin{revnewblock}
+\noindent\textbf{[Restaurado --- Introducción alineada con PDF 21\,pp; recuperado tras recorte agresivo.]}\par
+Air pollution remains one of the most important environmental and public-health challenges worldwide. Short-term exposure to elevated concentrations of PM$_{10}$, PM$_{2.5}$, NO$_2$ and O$_3$ has been associated with increases in daily mortality and emergency hospital admissions due to respiratory and cardiovascular diseases, whereas long-term exposure contributes to the development of chronic respiratory and cardiovascular diseases, lung cancer and millions of premature deaths worldwide~\cite{Huang2024,EEA,RuizPaez2023}. Consequently, improving air quality has become a strategic priority for governments and international organizations, as reflected in the recommendations issued by the World Health Organization (WHO)~\cite{WHO}.
+
+Traditionally, air quality management has relied on two complementary sources of information: monitoring networks, which provide continuous observations of atmospheric pollutant concentrations, and atmospheric dispersion or chemical transport models, which simulate pollutant emissions, transport, chemical transformation and removal. Together, these approaches constitute the basis of current air quality assessment and forecasting systems~\cite{WHO2023}. Nevertheless, anticipating pollution episodes with sufficient lead time remains essential for implementing preventive measures aimed at reducing population exposure and mitigating their environmental and health impacts~\cite{Gao2024}.
+
+The importance of predictive tools has recently increased following the adoption of the new \textit{European Air Quality Directive (EU) 2024/2881}, which reinforces the role of modelling and forecasting techniques in air quality assessment, environmental planning and public health protection~\cite{EUdir}. Similarly, the \textit{Spanish National Short-Term Action Plan} highlights the need for forecasting systems capable of anticipating pollution episodes and supporting the timely activation of mitigation measures by public authorities~\cite{MITECO2021}. In this context, the \textit{24-hour moving average} of PM$_{10}$ is considered in the present work as an operational forecasting target. Accordingly, the error in the forecasted 24-hour moving average, hereafter MA24, is used as the primary evaluation metric, while hourly forecasting performance is retained as a complementary diagnostic measure.
+
+Recent advances in artificial intelligence have opened new opportunities for air-quality forecasting. Deep learning models can represent nonlinear relationships and long-range temporal dependencies, making them promising candidates for environmental prediction tasks. However, air pollution is inherently a spatio-temporal process: concentrations measured at a monitoring station depend not only on their local temporal evolution, but also on atmospheric transport, meteorological conditions, topography, emission patterns and interactions with other stations. Accurately representing these spatial dependencies remains a major challenge in data-driven air-quality forecasting.
+
+This challenge is particularly relevant in the \textit{Bajo Nervi\'on} area in the Basque Country. The interaction between urban, industrial and port activities, together with the influence of the Bilbao estuary, sea-breeze circulations and complex topography, generates highly dynamic atmospheric conditions. These characteristics make the \textit{Bajo Nervi\'on} area a relevant case study for evaluating alternative strategies for spatial representation in PM$_{10}$ forecasting.
+
+Within this context, this work compares three Transformer-based forecasting approaches for PM$_{10}$ prediction: a temporal Informer model, a graph-based GAT-Informer architecture, and AirFormer, which employs structured spatial attention. The models are evaluated under a common experimental framework and are compared with a competitive XGBoost baseline~\cite{Chen2016XGBoost}. In addition to conventional hourly forecasting metrics, the evaluation focuses on errors in the forecasted 24-hour moving average of PM$_{10}$ and on performance relative to persistence baselines. This design assesses the potential operational value of each method for supporting the anticipation of high-PM$_{10}$ conditions.
+
+\paragraph{Research questions.}
+The experimental design addresses four questions:
+\begin{itemize}[leftmargin=1.4em,itemsep=0.25em]
+\item \textbf{Spatial representation versus temporal-only forecasting (H1):} Do architectures with explicit spatial modeling mechanisms, namely GAT-Informer and AirFormer, improve PM$_{10}$ forecasts relative to a temporal Informer baseline under a common dataset, feature set and evaluation protocol?
+\item \textbf{Structured attention versus fixed graph connectivity (H2):} Does AirFormer outperform GAT-Informer when representing inter-station dependencies in the \textit{Bajo Nervi\'on} area?
+\item \textbf{Baseline and episode management (H3):} How do Transformers compare to the XGBoost baseline under equal station-mean MA24 ranking, and can the models support episode management (routing, high-PM$_{10}$ peaks) under the shared protocol?
+\item \textbf{Vs persistence (H4):} Do learned models improve over MA24 / last-observation persistence baselines?
+\end{itemize}
+
+\paragraph{Contributions.}
+This work makes the following contributions:
+\begin{itemize}[leftmargin=1.4em,itemsep=0.25em]
+\item It provides a common-protocol comparison of Informer, GAT-Informer and AirFormer for PM$_{10}$ forecasting in the \textit{Bajo Nervi\'on} area, using an input look-back of $L=48$ hours and a prediction horizon of $H=24$ hours.
+\item It includes XGBoost as a competitive non-deep-learning benchmark, trained under the same temporal splits, forecast horizons and feature packs. XGBoost is not treated as a fourth spatial strategy, but as a strong tabular baseline against which the value of Transformer-based spatial mechanisms can be assessed.
+\item It evaluates operational forecasting performance using MA24 RMSE and skill relative to persistence, complemented by hourly error metrics, sensitivity analyses for the look-back window and a specific discussion of high-PM$_{10}$ periods.
+\item It analyses practical deployment choices by comparing oracle station-level model selection with realistic zone-level model selection, thereby assessing whether a single spatial model provides a robust operational solution across stations.
+\end{itemize}
+\end{revnewblock}
+
+% -------------------------
+\section{State of the art}
+\label{sec:sota}
+\begin{revnewblock}
+\noindent\textbf{[Restaurado --- SOTA alineado con PDF 21\,pp.]}\par
+\subsection{Air Quality Forecasting Using Artificial Intelligence}
+
+Air-quality forecasting has received increasing attention because of its relevance to environmental management, public-health protection and the implementation of short-term mitigation measures. Forecasting methods can broadly be grouped into physics-based atmospheric models and data-driven approaches.
+
+Physics-based approaches, including atmospheric dispersion and chemical transport models, explicitly represent emissions, transport, chemical transformation and deposition processes. Their main advantage is physical interpretability and the possibility of simulating alternative emission or meteorological scenarios. However, these models require detailed and uncertain input information, substantial domain expertise and considerable computational resources~\cite{AQAT}. Data-driven methods have expanded rapidly with the availability of historical observations from automatic air-quality monitoring networks. Classical statistical models, such as autoregressive integrated moving average (ARIMA) models, have been widely used because of their simplicity and interpretability~\cite{Box2015}. Their performance may nevertheless be limited when pollutant dynamics are nonlinear, non-stationary and affected by complex interactions between emissions, meteorology and spatial transport.
+
+Gradient-boosted decision trees, particularly XGBoost, are strong baselines for structured prediction problems, including environmental forecasting applications~\cite{Chen2016XGBoost,Wallek2024,Wang2023XGBoost}. When supplied with lagged pollutant concentrations, meteorological variables, calendar descriptors and station-related features, they can provide accurate forecasts at relatively low training cost. Although they do not explicitly model graph-based or attention-based spatial interactions, they provide a demanding non-deep-learning benchmark against which the added value of Transformer architectures can be assessed.
+
+Deep-learning models have further extended the capacity of data-driven forecasting. Recurrent neural networks, especially Long Short-Term Memory (LSTM) and Gated Recurrent Unit (GRU) architectures, can capture nonlinear temporal dependencies and have been applied extensively to air-quality prediction~\cite{Hochreiter1997,Zhao2023,Qin2019}. More recently, Transformer architectures have emerged as a prominent approach for long-horizon time-series forecasting because attention mechanisms can capture relationships between distant time steps without the strictly sequential processing required by recurrent networks~\cite{Vaswani2017,wen2023transformerstimeseriessurvey}. For the 24-hour forecasting horizon considered in this work, with a 48-hour look-back window, Transformer models offer a suitable mechanism to learn dependencies across multiple diurnal cycles and meteorological regimes. Informer is a representative efficient Transformer architecture for long-sequence forecasting, using ProbSparse attention and sequence-distillation mechanisms to reduce computational complexity~\cite{Zhou2021Informer}. However, an Informer applied without an explicit spatial mechanism may not adequately represent the structure of interactions among monitoring stations.
+
+\subsection{Spatial Representation for Air-Quality Forecasting}
+
+Air pollution is an inherently spatio-temporal process. Measurements at a given station reflect local emission sources and meteorology, but they are also influenced by regional transport, topography, wind direction, atmospheric stability and pollutant concentrations at other locations. Consequently, the representation of spatial dependencies is a central modelling decision in air-quality forecasting.
+
+A first family of approaches focuses primarily on temporal dynamics. In these models, each station is forecast independently, or information from multiple stations is included as multivariate input without an explicit spatial structure. This formulation provides an important baseline because it tests how much forecast skill can be obtained from local history and correlated covariates alone. Informer is used in this study as a representative temporal Transformer baseline~\cite{Zhou2021Informer,Zhou2023InformerEx}.
+
+A second family represents the monitoring network as a graph. Stations are treated as nodes, while edges encode a predefined spatial relationship, such as geographic distance, $k$-nearest-neighbour connectivity, historical correlation or another similarity criterion. Graph Neural Networks aggregate information from connected stations, enabling the model to exploit structured inter-station dependence. Graph Attention Networks extend this principle by learning attention weights over the neighbours permitted by the graph connectivity~\cite{Velickovic2018}. Hybrid GAT-Informer models combine graph-based spatial aggregation with Transformer-based temporal forecasting and provide a natural framework for assessing the value of a fixed graph representation~\cite{YU2023110864}.
+
+A third family uses attention mechanisms to model spatial relationships more flexibly. Rather than relying solely on a predefined adjacency matrix, these architectures learn spatial interaction patterns from data. AirFormer is a representative example: it combines temporal and spatial attention within a deterministic forecasting stage and incorporates a stochastic latent-variable stage to quantify uncertainty~\cite{liang2022airformer}. In its original evaluation, AirFormer was trained on four years of observations from 1,085 monitoring stations in China and reported improvements over comparison methods for 72-hour forecasts~\cite{liang2022airformer}. Its structured spatial-attention design is particularly relevant to settings where the relation between stations may vary with atmospheric conditions.
+
+The distinction between fixed graph and attention-based methods should nevertheless be interpreted carefully. A graph-attention model can learn different weights among the neighbours allowed by its adjacency structure, whereas its potential interactions remain constrained by the initial graph. Conversely, attention-based approaches can model broader data-driven interactions, but learned attention weights should not be interpreted directly as physical transport pathways without additional atmospheric validation.
+
+Despite substantial progress in spatio-temporal forecasting, published comparisons often differ simultaneously in geographical domain, monitoring-network density, input variables, prediction horizon, target pollutant, training/test splits and evaluation metrics~\cite{Agbehadji2024,Chen2024}. These differences make it difficult to attribute reported performance gains specifically to the spatial representation strategy. In particular, evidence remains limited on controlled comparisons of temporal-only Transformers, fixed-graph architectures and structured spatial-attention models for PM$_{10}$ forecasting in complex European urban-industrial environments.
+
+This limitation motivates the present work. Informer, GAT-Informer and AirFormer are evaluated using the same study area, target variable, temporal splits, predictor variables, look-back window and forecasting horizon. XGBoost is trained under the same splits and feature packs as a competitive non-Transformer benchmark. The resulting experimental design aims to isolate, as far as possible, the contribution of alternative spatial representation strategies to PM$_{10}$ forecasting and to the operational estimation of the 24-hour moving average.
+
+\subsection{PM$_{10}$ Forecasting and Episode-Oriented Evaluation}
+
+Although PM$_{2.5}$ has received substantial attention in recent deep-learning air-quality forecasting studies, PM$_{10}$ presents specific modelling challenges. PM$_{10}$ may originate from combustion-related emissions, industrial activities, construction, road-dust resuspension, wind-blown dust, agriculture, wildfires and other natural or anthropogenic sources~\cite{Karagulian2015}. Road-dust resuspension is of particular relevance because it can contribute to the coarse-particle fraction and can vary with traffic activity, surface conditions and meteorology. The relative contribution of these processes may vary substantially between locations and atmospheric regimes. Consequently, findings obtained for PM$_{2.5}$ cannot be transferred directly to PM$_{10}$ without empirical validation. In particular, the relevance of coarse-particle sources and resuspension processes may increase the potential value of combining local temporal history with information from multiple monitoring stations and meteorological covariates.
+
+For operational air-quality management, conventional global regression metrics may be insufficient. Recent PM$_{2.5}$ and PM$_{10}$ deep-learning studies commonly report RMSE and $R^2$ as primary evaluation metrics~\cite{Zhang2026X2AQFormer}. However, a model may exhibit low average error while systematically underestimating relatively infrequent high-concentration periods. Therefore, regression metrics should be complemented by high-concentration and event-oriented diagnostics. In particular, probability of detection (POD), false-alarm ratio (FAR), true skill score (TSS) and critical success index (CSI) have been applied to evaluate predictions of high PM$_{10}$ and PM$_{2.5}$ concentrations~\cite{Chae2021}.
+
+The present work treats the forecasted 24-hour moving average of PM$_{10}$ (MA24) as its primary operational target. This choice is also consistent with the 24-hour averaging period used in the WHO Global Air Quality Guidelines~\cite{WHO} and Spanish National Short-Term Action Plan~\cite{MITECO2021}, which recommend a PM$_{10}$ concentration of 45~\textmu g\,m$^{-3}$ over 24 hours~\cite{WHO}. This health-based guideline should not, however, be interpreted as a substitute for the applicable legal thresholds or local episode-management protocols.
+
+Accordingly, MA24 RMSE is used as the primary metric in this work. It is complemented by hourly MAE and RMSE, skill relative to persistence, and diagnostics focused on high-PM$_{10}$ observations. Where a specific episode threshold is defined, the evaluation can also include POD, FAR, TSS and CSI to assess the ability of the models to support episode-oriented decision-making.
+\end{revnewblock}
+
+% -------------------------
+\section{Study Area and Dataset}
+\label{sec:study}
+\begin{revnewblock}
+\noindent\textbf{[Restaurado --- Área de estudio y dataset alineados con PDF 21\,pp.]}\par
+\subsection{Study area}
+
+The proposed methodology is evaluated using data from the official Air Quality Monitoring Network (AQMN) of the Basque Country~\cite{EuskadiAQMN} located in the \textit{Bajo Nervi\'on} (Figure~\ref{fig:bajonervion}) area, zone~2 according to regional methodological zoning.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.60\textwidth]{bajonervion.jpg}
+\caption{Study area and AQMN in the \textit{Bajo Nervi\'on}.}
+\label{fig:bajonervion}
+\end{figure}
+
+Previous studies have shown that the study area constitutes a complex coastal atmospheric environment where pollutant transport is strongly influenced by the interaction between the Bilbao estuary, the surrounding orography and local meteorological processes~\cite{Oke1987,Whiteman2000,GonzalezAparicio2013}. This spatial variability cannot be explained solely by the temporal evolution at individual stations, motivating the explicit modelling of spatial dependencies (H2).
+
+\subsection{Dataset}
+
+The dataset was constructed by integrating hourly measurements from 18 monitoring stations collected within the study area. The data were retrieved from Open Data Euskadi, the open data portal of the Basque Government~\cite{OpenDataEuskadi}. All time series were synchronized using a common hourly temporal resolution, generating a unified spatio-temporal dataset suitable for model training.
+
+The target variable considered throughout this work is PM$_{10}$, selected because of its environmental relevance and its role within the current European and Spanish regulatory framework for air quality management. In addition, several atmospheric pollutants, meteorological variables and temporal descriptors were incorporated as predictor variables in order to represent the main processes governing pollutant emission, transport and dispersion.
+
+\begin{table}[H]
+\centering
+\caption{Variables included in the dataset.}
+\label{tab:variables}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{ll}
+\toprule
+\textbf{Category} & \textbf{Variables} \\
+\midrule
+Target pollutant &
+PM$_{10}$ \\
+\addlinespace
+Air pollutants &
+PM$_{2.5}$, NO$_2$, NO, NO$_x$, SO$_2$, CO, O$_3$ \\
+\addlinespace
+Meteorological &
+Wind speed, wind direction, temperature,\\
+variables &
+relative humidity, rainfall \\
+\addlinespace
+Temporal &
+Hour of day, day of week, month \\
+\addlinespace
+Additional &
+Saharan dust intrusion indicator \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Prior to model training, all variables were normalized and transformed into fixed-length temporal sequences using a sliding-window strategy, generating the input tensors required by the evaluated Transformer architectures.
+\end{revnewblock}
+
+% -------------------------
+\section{Methodology}
+\label{sec:methodology}
+\begin{revnewblock}
+\noindent\textbf{[Restaurado --- Metodología alineada con PDF 21\,pp.]}\par
+\subsection{Experimental Design}
+The experimental design follows the same four aims introduced previously (H1--H4). Three Transformer-based architectures are compared under a common framework: Informer, GAT-Informer and AirFormer. To ensure a fair comparison, all architectures share the same study area, target pollutant, temporal resolution, input variables, prediction horizon, data partitioning strategy and evaluation metrics. Global ranking uses the equal station mean (1/18) of station-wise MA24 RMSE so that multi-node and per-station models are compared on the same footing. Therefore, the only experimental factor that changes among models is the strategy adopted to represent spatial relationships between monitoring stations. Figure~\ref{fig:experimental_workflow} summarizes the complete experimental workflow adopted in this work.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.80\textwidth]{fig_experimental_workflow.png}
+\caption{Experimental workflow.}
+\label{fig:experimental_workflow}
+\end{figure}
+
+\subsection{Data Preparation and analysis}
+Air quality and meteorological variables were downloaded through the official public API, synchronized to a common hourly temporal resolution and integrated into a unified spatio-temporal dataset. Since meteorological variables are not available at every monitoring station, missing observations were completed using a graph-based spatial assimilation strategy. A weighted graph was first constructed according to meteorological similarity among stations. Subsequently, missing meteorological observations were transferred from the most representative neighbouring stations before applying temporal interpolation to short gaps. This meteorological similarity graph is used for gap-filling only; it is not the adopted adjacency for GAT-Informer forecasting (Section~\ref{sec:methodology-gat}). An exploratory data analysis (EDA) was carried out to evaluate data availability, identify missing observations and analyse the relationships among variables. Based on this analysis, the common study period used for training is 2019-08-30 to 2025-12-29 (strict intersection of the 18 stations), hereafter referred to as late August 2019--December 2025.
+
+\subsection{Feature Selection}
+Feature selection followed a progressive cumulative ablation combining domain knowledge and exploratory data analysis~\cite{Zhang2026X2AQFormer}. Five nested feature configurations (F1--F5) were defined so that each level adds a variable block to the previous one, quantifying the contribution of calendar features, meteorology, co-pollutants and Saharan dust indicator. The Saharan indicator is the daily net African dust load (\textmu g\,m$^{-3}$) at the regional background site Valderejo, following the MITECO--CSIC procedure for natural PM$_{10}$ episodes~\cite{MITECO2013NaturalPM}.
+
+\begin{table}[H]
+\centering
+\caption{Feature configurations evaluated in this work.}
+\label{tab:features}
+\begin{tabular}{ll}
+\toprule
+Configuration & Variables included\\
+\midrule
+F1 & PM$_{10}$\\
+F2 & F1 + temporal variables\\
+F3 & F2 + meteorology\\
+F4 & F3 + co-pollutants\\
+F5 & F4 + Saharan dust indicator\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Prior to defining these configurations, Autocorrelation Function (ACF) analysis was carried out to estimate the temporal memory of the PM$_{10}$ series. Based on the median autocorrelation across monitoring stations, an input sequence length of 48 hours was selected, while the prediction horizon was fixed at 24 hours. The 24\,h horizon matches the regulatory MA24 indicator used in the Spanish short-term action plan (H3). Importantly, despite this ACF-based choice of $L{=}48$\,h, a dedicated sensitivity analysis was performed by retraining the models with alternative look-back lengths $L\in\{24,48,72,96\}$ under the same splits, horizon and feature packs. Results (Table~\ref{tab:seqlen}) show that AirFormer remains essentially flat across these lengths, so $L{=}48$\,h is retained as the reference setting without loss of generality.
+
+\subsection{Evaluated Architectures}
+\label{sec:methodology-gat}
+Three Transformer-based architectures were evaluated in this work. They differ exclusively in the way spatial information is represented, while sharing the same forecasting objective and experimental protocol. In addition, a per-station XGBoost model was trained on flattened lag windows with the same F1--F5 packs, chronological split and MA24 evaluation, providing a solid classical ML baseline. The starting implementations are the official repositories Informer~\cite{Zhou2021Informer,Zhou2023InformerEx}, AirFormer~\cite{liang2022airformer}, and GAT-Informer~\cite{YU2023110864}. The code was adapted to the experimental protocol of this work (pollutant, sequence length, prediction horizon, feature selection protocols, and metrics), while preserving the base architecture of each model.
+
+\begin{table}[H]
+\centering
+\caption{Comparison of the evaluated architectures.}
+\label{tab:architectures}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{p{3cm}p{3cm}p{3.2cm}p{2.5cm}}
+\toprule
+\textbf{Architecture} &
+\textbf{Spatial representation} &
+\textbf{Spatial relationships} &
+\textbf{Prediction}\\
+\midrule
+Informer &
+None &
+Not explicitly modelled &
+Per station \\
+GAT-Informer &
+Static graph &
+Predefined graph &
+Multi-station \\
+AirFormer &
+Dynamic attention &
+Learned during training &
+Multi-station \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Since all evaluated architectures provide forecasts for each monitoring station individually, the evaluation is first performed at station level. Global performance indicators are subsequently obtained by averaging the station-wise metrics, ensuring that each monitoring station contributes equally to the overall comparison regardless of the number of available observations.
+
+\subsection{Training Protocol}
+To ensure a fair comparison among the evaluated architectures, all experiments were conducted under a common training protocol. Prior to training, all predictor variables were normalized using statistics computed exclusively from the training dataset in order to avoid data leakage; the resulting parameters were applied to validation and test sets. Input samples were generated using a sliding-window strategy with $L{=}48$\,h and $H{=}24$\,h. The complete dataset was divided chronologically into training (70\%), validation (10\%) and test (20\%) subsets. Each architecture was trained using the optimization strategy and hyperparameter configuration recommended in its original implementation, kept intentionally minimal to preserve the intended behaviour of each model. Due to the large number of experiments required, model training was performed on Tecnalia's High-Performance Computing (HPC) infrastructure (GPU/CPU). Table~\ref{tab:training} summarizes the common experimental settings.
+
+\begin{table}[ht]
+\centering
+\caption{Common training settings adopted in the experimental evaluation.}
+\label{tab:training}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{ll}
+\toprule
+\textbf{Parameter} & \textbf{Value} \\
+\midrule
+Target pollutant & PM$_{10}$ \\
+Temporal resolution & 1 h \\
+Input sequence length & 48 h \\
+Prediction horizon & 24 h \\
+Window generation & Sliding window \\
+Train / Validation / Test & 70\% / 10\% / 20\% \\
+Normalization & Training-set statistics \\
+Model selection & Validation loss \\
+Evaluation & Independent test set \\
+Hardware & GPU \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Evaluation Strategy}
+
+The evaluated architectures were compared from two complementary perspectives. First, predictive performance was quantified using the Mean Absolute Error (MAE) and Root Mean Squared Error (RMSE) on hourly forecasts. Second, an operational assessment was carried out on the 24-hour mean of PM$_{10}$ derived from the predicted hourly concentrations---the primary ranking metric of this study. Metric definitions used throughout are: \emph{Hourly:} MAE/RMSE on the 24 forecast leads; \emph{MA24:} error between the mean of the 24 hourly forecasts and the mean of the 24 hourly observations for each window (primary for ranking); \emph{Skill:} relative improvement versus MA24 persistence (last observed 24\,h mean). This MA24-centred evaluation is the operational heart of H3. The same protocol was applied to the three architectures so that observed differences can be attributed to the spatial representation strategy.
+\end{revnewblock}
+
+% -------------------------
+\section{Results}
+\label{sec:results}
+
+All models were evaluated under a common protocol on Basque Country (18 PM$_{10}$ stations): look-back window $L{=}48$\,h, forecast horizon $H{=}24$\,h, chronological train/validation/test split, and primary metric MA24 RMSE (error on the 24-hour moving average of predicted versus observed PM$_{10}$). Feature ablation levels F1--F5 range from target-only (F1) to calendar features (F2), meteorology (F3), co-pollutants (F4) and Saharan-dust indicators (F5). Three modelling paradigms are reported---Informer2020 (purely temporal, per station), GAT-Informer (static similarity graph) and AirFormer (dynamic spatial attention)---plus an XGBoost tabular baseline. Fair global means use the equal station mean (1/18). Persistence baselines support skill evaluation (H4).
+
+Results are organised by research question. Table~\ref{tab:results-best} is the shared F1--F5 headline ranking used for H1--H2 (spatial strategies under the official feature ladder). Absolute best MA24 scores later improve further with Saharan-intensity extensions (Section~\ref{sec:results-peaks}: AirFormer F3IL $\approx$5.42; XGBoost F5I $\approx$5.42), which also beat this table overall---not only on peak slices.
+
+\begin{table}[ht]
+\centering
+\caption{Best configuration per model family under the official F1--F5 ladder (PM$_{10}$; lower MA24 RMSE is better). Skill is relative to MA24 persistence. GAT-Informer denotes the adopted base (multi-feature + PM$_{10}$ graph). Peak-oriented packs (F3IL / F5I) improve on these scores globally; see Table~\ref{tab:peak-ext}.}
+\label{tab:results-best}
+\small
+\begin{tabular}{@{}llrrr@{}}
+\toprule
+Model & Best config & MA24 RMSE & Hourly RMSE & Skill (\%) \\
+\midrule
+\textbf{XGBoost} & F5 & \textbf{5.45} & 9.02 & \textbf{+24.4} \\
+AirFormer & F5 & 5.65 & 9.08 & +21.6 \\
+Informer2020 & F1 & 6.06 & 9.52 & +15.9 \\
+GAT-Informer & F2 & 6.10 & 9.55 & +15.4 \\
+Persistence (MA24) & --- & 7.20 & 10.37 & --- \\
+Persistence (last) & --- & 8.79 & 11.51 & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ----- H1 -----
+\subsection{H1 - Spatial versus temporal modelling}
+\label{sec:results-h1}
+\label{sec:results-spatial-map}
+
+\textbf{Question:} Does incorporating spatial modelling (AirFormer, GAT-Informer) improve PM$_{10}$ forecasts relative to a purely temporal Informer?
+
+Table~\ref{tab:results-best} shows that XGBoost F5 (5.45) ranks first on the official F1--F5 ladder, followed by AirFormer F5 (5.65)---now the best official AirFormer config, slightly ahead of AirFormer F3 (5.70). For the spatial contrast among Transformers, AirFormer F5 (and F3) beat Informer F1 (6.06), whereas the adopted GAT-Informer F2 (6.10) does not. Figure~\ref{fig:ma24-by-config} shows that AirFormer pulls ahead once meteorology is available (F3) and remains strong through F5 with Saharan intensity/memory, while Informer is strongest in the univariate setting (F1) and does not benefit from richer packs. XGBoost F5 sets the strongest global score; H1 itself is assessed via AirFormer versus Informer and GAT under the same protocol.
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.92\linewidth]{fig_ma24_rmse_by_config.png}
+\caption{Global mean MA24 RMSE by feature configuration (F1--F5) and model (lower is better). XGBoost F5 is the best overall point; AirFormer F5 is its best spatial Transformer score on the official ladder (Table~\ref{tab:results-best}).}
+\label{fig:ma24-by-config}
+\end{figure}
+
+Global means alone do not show where spatial modelling helps. Figure~\ref{fig:spatial-benefit} maps, for each station, the MA24 RMSE difference using the best F-config of each model (green $=$ model better than Informer; red $=$ Informer better).
+\[
+\Delta = \mathrm{RMSE}_{\mathrm{Informer}} - \mathrm{RMSE}_{\mathrm{model}}
+\]
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.98\textwidth]{fig_spatial_vs_temporal_map.png}
+\caption{(Bajo Nervi\'on): station-wise MA24 RMSE benefit versus Informer (best F per model). Left: AirFormer; right: GAT-Informer. Green indicates lower error than Informer.}
+\label{fig:spatial-benefit}
+\end{figure}
+
+AirFormer improves on Informer at most stations (largest gains at inland/mid-estuary sites such as San Juli\'an and Sangroniz; clear benefits around Muskiz--Abanto and the Bilbao core). A few coastal/northern sites (Algorta, San Miguel) are near-neutral.
+
+Station-level detail is summarised in Table~\ref{tab:best-station}.
+\revnew{[Recorte 15\,p: omitidas Fig.~\ref{fig:heatmap} (heatmap estación$\times$modelo) y Fig.~\ref{fig:pred-overview} (trazas MA24 18 estaciones); ranking en Tab.~\ref{tab:best-station}.]}
+
+\begin{table}[ht]
+\centering
+\caption{Best Transformer model$\times$config per station under the official F1--F5 ladder (MA24 RMSE). Only Informer, GAT-Informer and AirFormer are compared---aligned with H1 (spatial vs temporal). AirFormer wins 17/18 stations; GAT-Informer wins SAN MIGUEL at F2.}
+\label{tab:best-station}
+\footnotesize
+\begin{tabular}{@{}lllr@{}}
+\toprule
+Station & Model & F & MA24 RMSE \\
+\midrule
+SAN MIGUEL & GAT-Informer & F2 & 3.88 \\
+ABANTO & AirFormer & F5 & 4.06 \\
+MUSKIZ & AirFormer & F5 & 4.46 \\
+SANTURCE & AirFormer & F3 & 4.72 \\
+SANGRONIZ & AirFormer & F5 & 4.96 \\
+ALONSOTEGI & AirFormer & F5 & 4.98 \\
+MAZARREDO & AirFormer & F5 & 5.20 \\
+EUROPA & AirFormer & F5 & 5.25 \\
+LAS CARRERAS & AirFormer & F5 & 5.31 \\
+CASTREJANA & AirFormer & F3 & 5.34 \\
+M\textsuperscript{a} DIAZ HARO & AirFormer & F3 & 5.66 \\
+ERANDIO & AirFormer & F5 & 5.72 \\
+ARRAIZ (Monte) & AirFormer & F5 & 5.91 \\
+SAN JULIAN & AirFormer & F5 & 5.99 \\
+BASAURI & AirFormer & F5 & 6.31 \\
+ZIERBENA (Puerto) & AirFormer & F5 & 6.46 \\
+BARAKALDO & AirFormer & F5 & 6.53 \\
+ALGORTA\_BBIZI2 & AirFormer & F5 & 7.44 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+With one model per station, AirFormer is the selected Transformer at 17/18 sites (mostly F5; F3 at a few stations); GAT-Informer F2 wins only at SAN MIGUEL. Predictions follow the observed MA24 baseline well, but even the local best Transformer under-predicts the sharpest high-PM$_{10}$ peaks---the residual H1 limitation that Section~\ref{sec:results-peaks} addresses with Saharan intensity/memory packs.
+
+\revnew{\textbf{Answer (H1):} Spatial modelling helps when it is dynamic: AirFormer F5/F3 ($\approx$5.65 / 5.70) beats Informer F1 ($\approx$6.06) globally and at most stations. A fixed-graph GAT-Informer does not systematically improve on the temporal baseline in \textit{Bajo Nervi\'on}. Informer remains a strong univariate reference (best at F1). Cross-family ranking vs.\ XGBoost follows in Section~\ref{sec:results-h3}.}
+
+% ----- H2 -----
+\subsection{H2 - Dynamic versus fixed spatial structure}
+\label{sec:results-h2}
+\label{sec:results-gat-variants}
+\label{sec:results-ablation-f}
+
+\textbf{Question:} Do dynamic spatial relations (AirFormer) better capture Bajo Nervi\'on dispersion than a fixed similarity graph (GAT-Informer)?
+
+Beyond the H1 ranking, we compare how spatial structure is encoded. Table~\ref{tab:global-mean-f} and Table~\ref{tab:wins-f} show the F1--F5 configurations: AirFormer gains sharply at F5; whereas GAT-Informer peaks at F2 and stays near Informer. Meteorology helps dynamic attention; tree ensembles exploit rich tabular lags strongly once calendar/meteo features are added.
+
+\begin{table}[ht]
+\centering
+\caption{Global mean MA24 RMSE by feature configuration and model ($n{=}18$ stations).}
+\label{tab:global-mean-f}
+\footnotesize
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+F & Informer & AirFormer & GAT-Informer \\
+\midrule
+F1 & 6.06 & 6.23 & 6.10 \\
+F2 & 6.16 & 6.27 & 6.10 \\
+F3 & 6.31 & 5.70 & 6.11 \\
+F4 & 6.27 & 5.83 & 6.31 \\
+F5 & 6.38 & 5.65 & 6.17 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[ht]
+\centering
+\caption{Station wins by F-config (lowest MA24 RMSE among Informer, AirFormer, GAT-Informer and XGBoost). Aligned with H2: AirFormer dominates from F3 onwards.}
+\label{tab:wins-f}
+\footnotesize
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+F & $n$ & Informer & AirFormer & GAT-Informer \\
+\midrule
+F1 & 18 & 7 & 8 & 3 \\
+F2 & 18 & 4 & 8 & 6 \\
+F3 & 18 & 0 & 16 & 2 \\
+F4 & 18 & 1 & 15 & 2 \\
+F5 & 18 & 0 & 15 & 3 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+GAT-Informer uses a static Pearson top-5 similarity graph with parallel GAT and Informer branches. We adopt a PM$_{10}$ adjacency because it gave the best forecasting results and is more coherent from a domain-knowledge standpoint (pollutant co-variability, rather than meteorology alone). Figure~\ref{fig:af-vs-gat-adj} contrasts fixed adjacency weights (GAT) with projected attention shares at three hours (AirFormer F5): GAT locks an even, frozen neighbour mix; AirFormer concentrates mass on self ($\approx$30--40\%) with a few persistent partners and mild diurnal drift.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.98\linewidth]{fig_af_vs_gat_spatial_adjacency.png}
+\caption{Three example stations. Top: GAT-Informer---fixed PM$_{10}$ adjacency as ``\% that feeds the target'' (orange $=$ self). Bottom: AirFormer F5---projected attention to the same stations at 08:00, 12:00 and 18:00 (grouped bars). Three hours are shown for readability; the underlying attention is available for every hour of day.}
+\label{fig:af-vs-gat-adj}
+\end{figure}
+
+\revnew{[Recorte 15\,p: omitido el desglose itemizado largo de Fig.~\ref{fig:af-vs-gat-adj} (porcentajes hora a hora Abanto/San Juli\'an/Santurce); se conserva la figura y el mensaje arquitectural resumido arriba.]}
+
+\revnew{\textbf{Answer (H2):} Dynamic spatial attention (AirFormer) outperforms the fixed PM$_{10}$ graph under this protocol, both globally and spatially. AirFormer's official best is F5 (5.65), after the sharp F3 meteo jump (5.70). The gap is architectural (learned mixing), not adjacency choice (Fig.~\ref{fig:af-vs-gat-adj}).}
+
+% ----- H3 -----
+\subsection{H3 - Baseline ranking and episode management}
+\label{sec:results-h3}
+\label{sec:results-baseline}
+\label{sec:results-management}
+\label{sec:results-seqlen}
+
+\textbf{Question:} Under equal station-mean MA24 ranking, how do the Transformers compare to the XGBoost baseline, and can the models support episode management under the shared protocol?
+
+\paragraph{Transformers versus XGBoost.}
+H1--H2 isolate spatial strategies among Transformers. H3 first places those scores against the strong tabular baseline: does dynamic spatial attention still win once XGBoost is in the ranking?
+
+On the official F1--F5 ladder (Table~\ref{tab:results-best}), XGBoost F5 achieves the best global equal station-mean MA24 RMSE ($\approx$5.45), ahead of AirFormer F5 ($\approx$5.65), Informer F1 ($\approx$6.06) and GAT-Informer F2 ($\approx$6.10). AirFormer remains the best Transformer, but the tree ensemble sets the zone-level headline under the shared feature packs. The gap is modest ($\approx$0.20\,\textmu g\,m$^{-3}$ versus AirFormer F5) yet consistent across the F1--F5 progression (Table~\ref{tab:global-mean-f}).
+
+Under the same F3IL pack (meteorology + Saharan intensity/memory, without co-pollutants), AirFormer F3IL ($\approx$5.42) beats XGBoost F3IL ($\approx$5.54) by $\approx$0.12\,\textmu g\,m$^{-3}$. Conversely, on the co-pollutant stack (F5), XGBoost (5.45) beats AirFormer (5.65). The Saharan block helps both families, but each architecture pairs best with a different covariate subset---F3+Sahara for AirFormer, F4/F5+Sahara for XGBoost---rather than a single universally optimal feature pack (peak-oriented F3IL / F5I details below).
+
+\paragraph{Look-back robustness.}
+Despite the ACF-based choice $L{=}48$\,h, a sensitivity grid $L\in\{24,48,72,96\}$ was run under the same splits, horizon and F1--F5 packs (equal station-mean MA24 RMSE). Table~\ref{tab:seqlen} reports the best feature pack at each length. AirFormer stays in a narrow band ($\approx$5.44--5.65); XGBoost is slightly best at $L{=}48$ with F5 ($\approx$5.45). Informer remains strongest at F1 across all $L$, with a mild preference for $L{=}24$. GAT-Informer is stable for $L{\le}72$ but collapses at $L{=}96$ (best $\approx$7.41), so that length is discarded for the fixed-graph family. Overall, ranking conclusions are not driven by the official window; $L{=}48$\,h is retained without loss of generality.
+
+\begin{table}[H]
+\centering
+\caption{Look-back sensitivity: best MA24 RMSE (equal station mean) per model and $L$. The best F-pack at each cell is shown in parentheses. Lower is better; the official protocol uses $L{=}48$.}
+\label{tab:seqlen}
+\footnotesize
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+Model & $L{=}24$ & $L{=}48$ & $L{=}72$ & $L{=}96$ \\
+\midrule
+AirFormer & 5.54 (F5) & 5.65 (F5) & 5.44 (F5) & 5.45 (F5) \\
+XGBoost & 5.49 (F5) & \textbf{5.45} (F5) & 5.52 (F5) & 5.54 (F5) \\
+Informer2020 & 5.95 (F1) & 6.06 (F1) & 6.03 (F1) & 6.06 (F1) \\
+GAT-Informer & 6.23 (F3) & 6.10 (F2) & 6.09 (F1) & 7.41$^\dagger$ (F3) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Oracle versus realistic routing.}
+With the cross-family ranking established, two deployment questions follow: whether one zone-level model suffices, and whether error is acceptable in high-PM$_{10}$ regimes. An oracle that picks the best model$\times$config per station using the full test set improves $\approx$5\% MA24 RMSE over a single global XGBoost F5 (Table~\ref{tab:oracle}; Fig.~\ref{fig:oracle}). A realistic proxy (choose on the first half of test, evaluate on the second) shows low agreement with the oracle ($\approx$11\% of stations) and does not beat the best single model enough to justify per-station routing (Table~\ref{tab:realistic}).
+\revnew{[Recorte 15\,p: omitida Fig.~\ref{fig:realistic}; números en Tab.~\ref{tab:realistic}.]}
+
+\begin{table}[H]
+\centering
+\caption{Oracle routing (upper bound) versus single global models
+(full test MA24 RMSE).}
+\label{tab:oracle}
+\small
+\begin{tabular}{@{}llrr@{}}
+\toprule
+Strategy & Config & MA24 RMSE & vs oracle (\%) \\
+\midrule
+Oracle (best per station) & mixed & 5.19 & --- \\
+XGBoost (single) & F5 & 5.45 & +5.0 \\
+AirFormer (single) & F3IL & 5.42 & +4.2 \\
+AirFormer (single) & F5 & 5.65 & +8.9 \\
+Informer2020 (single) & F1 & 6.06 & +16.7 \\
+GAT-Informer (single) & F2 & 6.10 & +17.4 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[ht]
+\centering
+\caption{Realistic selector proxy (choose on 1st test half, evaluate on
+2nd). Eval RMSE on the holdout half.}
+\label{tab:realistic}
+\small
+\begin{tabular}{@{}llr@{}}
+\toprule
+Strategy & Config & Eval MA24 RMSE \\
+\midrule
+Oracle on eval half & mixed & 4.93 \\
+Realistic selector & mixed & 5.24 \\
+XGBoost (single, best F on half) & F5I & 5.23 \\
+AirFormer (single, best F on half) & F3IL & 5.27 \\
+GAT-Informer (single) & F2 & 5.34 \\
+Informer2020 (single) & F1 & 5.64 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\linewidth]{fig_oracle_vs_single_model.png}
+\caption{Oracle (best model per station) versus deploying a single global
+model (best F). The gap to XGBoost F5 is small.}
+\label{fig:oracle}
+\end{figure}
+
+\paragraph{High-PM$_{10}$ peaks and Saharan intensity extensions.}
+\label{sec:results-peaks}
+Episode management is driven by the upper tail. Stratifying hourly test error by observed PM$_{10}$ shows moderate errors in the 0--40\,\textmu g\,m$^{-3}$ bins, a sharp rise above 40\,\textmu g\,m$^{-3}$, and very large errors in the rare 80+ bin (Figure~\ref{fig:error-pm10}), often under Saharan-dust days. On the official F1--F5 ladder, F5 encodes continuous intensity and episode memory; XGBoost F5 (5.45) and AirFormer F5 (5.65) both improve on AirFormer F3 (5.70), but large errors persist in the 80+ bin.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.98\linewidth]{fig_error_by_pm10_level.png}
+\caption{Hourly error stratified by observed PM$_{10}$ level on the test set (headline models). Error concentrates in the high-concentration bins associated with Saharan episodes.}
+\label{fig:error-pm10}
+\end{figure}
+
+We therefore trained dedicated peak-oriented AirFormer extensions that keep $L{=}48$\,h, $H{=}24$\,h and the same chronological split, but enrich the F3 pack with a continuous Saharan intensity $Sah\_int$ (net African load from a regional background station on African-dust calendar days). Configurations: F3I $=$ F3$+Sah\_int$; F3IL $=$ F3I plus short intensity lags, episode duration and a 3-day max; F3IL\_pw $=$ F3IL with a soft peak-weighted training loss (higher weight on $y\geq 40$/80 and mild asymmetry when under-predicting; validation/early-stopping remain unweighted MAE). An aggressive peak loss on F3I alone (F3I\_pw) was also tested. Table~\ref{tab:peak-ext} summarises global MA24.
+\revnew{[Recorte 15\,p: omitida Tab.~\ref{tab:peak-slices} (RMSE por slice 40--80, 80+, Sah); filas 80+ ($\approx$94$\to$80--83) y Sahariano resumidas en texto.]}
+
+\begin{table}[H]
+\centering
+\caption{Peak-oriented and official Saharan-intensity configs (equal station-mean MA24 RMSE). AirFormer F3I / F3IL / F3IL\_pw improve on official F3 ($\approx$5.70) and on official AirFormer F5 ($\approx$5.65$\to$5.42--5.48); XGBoost F5I matches $\approx$5.42. Matched F3IL (meteo+Sahara, no co-pollutants) is reported for both AirFormer and XGBoost.}
+\label{tab:peak-ext}
+\small
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+Config & MA24 RMSE & vs F3 & vs F3I \\
+\midrule
+F3 (official, AirFormer) & 5.70 & --- & --- \\
+F5 (official, AirFormer) & 5.65 & $-0.05$ & --- \\
+F3I ($+Sah\_int$, AirFormer) & 5.48 & $-0.23$ & --- \\
+\textbf{F3IL} (AirFormer) & \textbf{5.42} & $\mathbf{-0.28}$ & $-0.06$ \\
+F3I\_pw (aggressive peak loss) & 5.81 & $+0.10$ & $+0.33$ \\
+\textbf{F3IL\_pw} (soft peak loss) & \textbf{5.43} & $\mathbf{-0.28}$ & $-0.05$ \\
+F5 (official, XGBoost) & 5.45 & --- & --- \\
+\textbf{XGBoost F5I} & \textbf{5.42} & --- & --- \\
+XGBoost F3IL (meteo+Sahara) & 5.54 & --- & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Importantly, the gain is not confined to extremes: F3I / F3IL / F3IL\_pw all improve the global MA24 ranking versus F3 (5.70$\to$5.48 / 5.42 / 5.43), i.e.\ they would top Table~\ref{tab:results-best} if admitted beside F1--F5. Relative to F3, F3I also cuts 80+ RMSE by $\approx$9 points; F3IL lowers 80+ to 82.7 while posting the best AirFormer MA24 including extras (5.42; ahead of official F5 at 5.65; $\approx$+25\% skill vs MA24 persistence). Aggressive peak weighting (F3I\_pw) buys the best mid/high bins but worsens global MA24 (5.81). Soft weighting on the lag pack (F3IL\_pw) nearly matches F3I\_pw on 80+ ($\approx$80.1) while preserving the improved global score ($\approx$5.43). For XGBoost, F5I reaches a similar global MA24 ($\approx$5.42 vs official F5 $\approx$5.45), confirming that intensity and memory matter for both Transformers and tree ensembles~\cite{Wallek2024,Wang2023XGBoost}.
+
+\revnew{\textbf{Answer (H3):} On the official ladder, XGBoost F5 is the strongest zone-level system; AirFormer is the strongest Transformer. Matched F3IL favours AirFormer and F5 favours XGBoost. Look-back sensitivity leaves both families flat around $L{=}48$\,h (Table~\ref{tab:seqlen}). For deployment, a single zone-level model is preferable to per-station routing (oracle gap $\approx$5\%; Tables~\ref{tab:oracle}--\ref{tab:realistic}). Peak-oriented packs (AirFormer F3IL, XGBoost F5I, $\approx$5.42) match or slightly beat the official ladder while cutting 80+ RMSE ($\approx$94$\to$$\approx$80--83; Table~\ref{tab:peak-ext}). Even with the best peak-oriented packs, absolute error in the 80+ bin stays $\approx$80\,\textmu g\,m$^{-3}$---the models are decision-support tools for routine MA24 surveillance, not stand-alone automated episode triggers.}
+
+% ----- H4 -----
+\subsection{H4 - Skill versus persistence}
+\label{sec:results-h4}
+
+\textbf{Question:} Do learned models improve over MA24 / last-observation persistence baselines?
+
+Figure~\ref{fig:skill-pers} and the Skill column of Table~\ref{tab:results-best} report relative improvement versus MA24 persistence. All learned models are positively skilled. On the official F1--F5 ladder, XGBoost F5 leads ($\approx$+24\%), closely followed by AirFormer F5 ($\approx$+22\%), then Informer and GAT ($\approx$+16\%). Adding the H3 peak extras on the same axis, AirFormer F3IL reaches $\approx$+24.8\% skill---matching or slightly exceeding official XGBoost F5---and XGBoost F5I is essentially tied ($\approx$+24.7\%).
+
+\revnew{[Restaurada Fig.~\ref{fig:skill-pers} (skill vs.\ persistencia); estaba omitida en recorte previo.]}
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.85\linewidth]{fig_skill_vs_persistence.png}
+\caption{Skill score versus MA24 persistence. Teal/navy bars: best official F1--F5 config per model. Orange bars: peak extras from H3 (AirFormer F3IL, XGBoost F5I).}
+\label{fig:skill-pers}
+\end{figure}
+
+\revnew{\textbf{Answer (H4):} Yes---Transformers and XGBoost clearly beat MA24 persistence under the shared protocol. On the official ladder, XGBoost F5 provides the largest skill ($\approx$+24\%). The H3 peak pack AirFormer F3IL (and XGBoost F5I) push skill to $\approx$+25\%.}
+
+\section{Conclusions}
+\label{sec:conclusions}
+
+\revnew{\textbf{[Editado --- Conclusiones reestructuradas por H1--H4 + caveat operativo.]}}\par
+Two complementary rankings structure the findings. Under the cumulative official ladder F1--F5---used for fair cross-model comparison---XGBoost F5 is the strongest system (MA24 RMSE $\approx$5.45; H3). When peak-oriented extensions are allowed, AirFormer F3IL and XGBoost F5I tie at $\approx$5.42, marginally improving global MA24 and high-PM$_{10}$ slices. A matched F3IL check (meteo+Saharan memory, no co-pollutants) confirms the pairing: AirFormer F3IL (5.42) beats XGBoost F3IL (5.54), while F5 favours XGBoost (5.45) over AirFormer (5.65)---so there is no single universally optimal feature pack. The conclusions below follow the four research questions (H1--H2 among Transformers; H3 baseline + episode management; H4 versus persistence).
+
+\revnew{\begin{enumerate}[leftmargin=1.4em,itemsep=0.35em]
+  \item \textbf{H1 (spatial vs temporal):} Dynamic spatial attention (AirFormer F5/F3) beats Informer F1 globally and at most stations; fixed-graph GAT-Informer F2 does not (Table~\ref{tab:results-best}; Fig.~\ref{fig:spatial-benefit}).
+  \item \textbf{H2 (dynamic vs fixed):} AirFormer outperforms GAT-Informer under the same F1--F5 packs; the gap is architectural (Fig.~\ref{fig:af-vs-gat-adj}; Tables~\ref{tab:global-mean-f},~\ref{tab:wins-f}).
+  \item \textbf{H3 (baseline + episodes):} XGBoost F5 leads on the official ladder; peak packs F3IL/F5I tie at $\approx$5.42 (Table~\ref{tab:peak-ext}). Deploy one zone-level model (Tables~\ref{tab:oracle}--\ref{tab:realistic}).
+  \item \textbf{H4 (vs persistence):} All models are positively skilled vs.\ persistence (Table~\ref{tab:results-best}); peak packs reach $\approx$+25\%.
+\end{enumerate}}
+
+\revnew{\paragraph{Operational caveat (H3).} Saharan intensity and episode-memory features materially reduce high-PM$_{10}$ error and improve global MA24 (F3I/F3IL/F5I; Section~\ref{sec:results-peaks}), confirming that African dust is the dominant driver of peak failures ($\approx$97\% of 80+~\textmu g\,m$^{-3}$ clock hours coincide with Saharan regime in the historical analysis). Nevertheless, absolute error in the 80+ bin remains large (pooled hourly RMSE $\approx$80~\textmu g\,m$^{-3}$---comparable to the magnitude of the event itself). The evaluated models---including the leading XGBoost and AirFormer packs---are therefore \textbf{not suitable as stand-alone automated decision systems} for extreme-episode management or regulatory compliance without expert oversight, forecast Saharan transport, and exceedance-oriented verification. They remain valuable as \textbf{decision-support} tools for routine MA24 surveillance. In this study, $Sah\_int$ is an information upper bound (observed or same-day intensity), not an operational +24\,h forecast; real deployment would require MITECO/CAMS-style dust alerts at forecast lead time.}
+
+\subsection{Future work}
+\label{sec:future-work}
+
+\revnew{Future work: (i)~forecast Saharan transport at +24\,h and cascade regime$\to$PM$_{10}$ models; (ii)~exceedance metrics (POD/FAR/CSI) for 40/50/80~\textmu g\,m$^{-3}$; (iii)~regime-specific or mixture models (AirFormer clean air, XGBoost high PM); (iv)~$H{=}48$\,h with MA24\_D1/D2; (v)~scale to other zones/pollutants; (vi)~human--machine workflows rather than stand-alone automated triggers.}
+
+\vspace{1em}
+\noindent\textbf{Acknowledgements.} This work is supported by TECNALIA Research \& Innovation.
+
+\noindent\textbf{Declaration of Generative AI.} During the preparation of this work, the authors used [GureGT-Qwen3] to translate the initial draft from Spanish and refine the grammatical flow of the manuscript. Additionally, generative AI tools, specifically [Cursor Version 3.13.10], were used under human supervision to accelerate the coding workflow.
+
+\revnew{%
+\hypertarget{fig:heatmap}{}\label{fig:heatmap}%
+\hypertarget{fig:pred-overview}{}\label{fig:pred-overview}%
+\hypertarget{fig:realistic}{}\label{fig:realistic}%
+\hypertarget{tab:peak-slices}{}\label{tab:peak-slices}%
+}
+
+% -------------------------
+\section*{References}
+\label{sec:references}
+\begin{multicols}{2}
+\small
+\bibliography{biblio,refs_metodologia}
+\end{multicols}
+
+\end{document}

@@ -1,0 +1,14 @@
+venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.env
+data/training/zone_2/**/seq_len_*/
+data/training/zone_2/airformer/
+data/training/zone_2/informer2020/
+data/training/zone_2/gat_informer*/
+data/training/zone_2/dataset_zone_2_PM10.csv
+results/**/checkpoints/
+results/**/*.pth
+results/**/*.pt
+results/**/*.npy

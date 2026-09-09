@@ -1,0 +1,136 @@
+{
+  "zone": 2,
+  "contaminant": "PM10",
+  "dataset": "C:/Users/105116/MASTER/data/training/zone_2/dataset_zone_2_PM10.csv",
+  "start_date": "2019-01-01",
+  "lags_hours": [
+    1,
+    3,
+    6,
+    12,
+    24,
+    48
+  ],
+  "min_availability_pct": 80.0,
+  "horizon": 24,
+  "n_stations": 18,
+  "seq_len": 48,
+  "seq_len_rationale": "First lag with ACF<0.3: 30 h; operational minimum max(24, 24) h; chosen candidate: 48 h",
+  "target_persistence": {
+    "corr_lag1": 0.8655,
+    "corr_lag24": 0.3921,
+    "corr_lag48": 0.25
+  },
+  "variables_keep": [
+    "NO2",
+    "NOx",
+    "Sah",
+    "NO",
+    "T",
+    "wind_sin",
+    "RA",
+    "month_cos",
+    "LL",
+    "VV",
+    "dow_sin",
+    "dow_cos",
+    "PR",
+    "hour_sin",
+    "month_sin",
+    "hour_cos",
+    "H",
+    "wind_cos"
+  ],
+  "variables_review_60_80": [
+    "SO2"
+  ],
+  "variables_drop_below_60": [
+    "PM25",
+    "CO",
+    "O3"
+  ],
+  "ablation_levels": [
+    {
+      "level": "F1",
+      "description": "Autoregressive (target only)",
+      "n_requested": 1,
+      "n_used": 1,
+      "features_used": "PM10",
+      "features_excluded": ""
+    },
+    {
+      "level": "F2",
+      "description": "Target + time features",
+      "n_requested": 7,
+      "n_used": 7,
+      "features_used": "PM10; hour_sin; hour_cos; dow_sin; dow_cos; month_sin; month_cos",
+      "features_excluded": ""
+    },
+    {
+      "level": "F3",
+      "description": "F2 + meteorology",
+      "n_requested": 13,
+      "n_used": 13,
+      "features_used": "PM10; hour_sin; hour_cos; dow_sin; dow_cos; month_sin; month_cos; VV; wind_sin; wind_cos; T; H; PR",
+      "features_excluded": ""
+    },
+    {
+      "level": "F4",
+      "description": "F3 + other pollutants",
+      "n_requested": 17,
+      "n_used": 15,
+      "features_used": "PM10; hour_sin; hour_cos; dow_sin; dow_cos; month_sin; month_cos; VV; wind_sin; wind_cos; T; H; PR; NO2; NOx",
+      "features_excluded": "PM25(53.9%); SO2(72.1%)"
+    },
+    {
+      "level": "F5",
+      "description": "F4 + Saharan dust (Sah)",
+      "n_requested": 18,
+      "n_used": 16,
+      "features_used": "PM10; hour_sin; hour_cos; dow_sin; dow_cos; month_sin; month_cos; VV; wind_sin; wind_cos; T; H; PR; NO2; NOx; Sah",
+      "features_excluded": "PM25(53.9%); SO2(72.1%)"
+    }
+  ],
+  "feature_config_recommendation": {
+    "baseline": "F1",
+    "recommended_default": "F5",
+    "ablation_to_train": [
+      "F1",
+      "F3",
+      "F5"
+    ],
+    "why_default": [
+      "Main config: F5 (time + meteorology + available co-pollutants + Sah).",
+      "Excluded by availability at this level: PM25(53.9%); SO2(72.1%)"
+    ],
+    "level_reasons": {
+      "F1": "Baseline: target history only (strong autoregressive signal).",
+      "F3": "Adds meteorology (dispersion / transport drivers).",
+      "F5": "Adds Saharan-dust flag on top of F4."
+    },
+    "features_used_default": [
+      "PM10",
+      "hour_sin",
+      "hour_cos",
+      "dow_sin",
+      "dow_cos",
+      "month_sin",
+      "month_cos",
+      "VV",
+      "wind_sin",
+      "wind_cos",
+      "T",
+      "H",
+      "PR",
+      "NO2",
+      "NOx",
+      "Sah"
+    ]
+  },
+  "notes": [
+    "Self-contained notebook: src/data/feature_selection.ipynb",
+    "Single seq_len per zone/contaminant (target ACF).",
+    "F1–F5 aligned with feature_configs.py for training.",
+    "recommended_default is the main F-level to train next; always keep F1 as baseline."
+  ]
+}

@@ -1,0 +1,7 @@
+# Supplementary forecast horizon (H=48 h)
+study_area: Bajo Nervión
+horizon: 48
+seq_len: 48
+zone: 2
+contaminant: PM10
+metrics: [ma24_rmse, ma24_d1, ma24_d2]

@@ -1,0 +1,9 @@
+model,feature_config,n_stations_won,model_label
+airformer,F3I,4,AirFormer
+xgboost,F5,4,XGBoost
+xgboost,F5I,3,XGBoost
+airformer,F3IL,2,AirFormer
+xgboost,F3I,2,XGBoost
+airformer,F5I,1,AirFormer
+gat_informer,F2,1,GAT-Informer
+xgboost,F3IL,1,XGBoost
