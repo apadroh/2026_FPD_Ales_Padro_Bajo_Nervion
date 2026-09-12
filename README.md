@@ -43,8 +43,7 @@ cd ../../..
 | `src/` | Training, models, comparison metrics |
 | `analysis/comparison/` | Paper figures |
 | `results/comparison/zone_2/**/tables` | Metric tables (incl. lead-time & exceedance) |
-| `docs/figures_print/` | Final PNGs for the manuscript |
-| `docs/tfm_manuscript_overleaf_v02.tex` | **Latest** manuscript source (v02) |
+| `analysis/comparison/` + `results/comparison/zone_2/**/figures` | Paper figures (regenerable) |
 | `results/comparison/zone_2/horizon_48/` | H=24 vs H=48 comparison tables |
 | `results/airformer/zone_2/ZONE2_PM10/F*_mse/` | MSE loss sensitivity (AirFormer) |
 

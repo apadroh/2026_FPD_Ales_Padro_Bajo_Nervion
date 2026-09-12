@@ -8,8 +8,9 @@ Includes:
   - EDA / ACF / feature-selection artefacts
   - code needed to rebuild packs, train, and regenerate paper tables/figures
   - configs for L in {24,48,72,96} and supplementary H=48
-  - light results tables + manuscript figures (v02)
-Excludes: archives, raw dumps, checkpoints, other zones, notebooks clutter, venv.
+  - light results tables + paper figures (under results/analysis)
+Excludes: archives, raw dumps, checkpoints, other zones, notebooks clutter, venv,
+  and the internal MASTER `docs/` tree (manuscript drafts, guiones, integration notes).
 """
 from __future__ import annotations
 
@@ -48,13 +49,10 @@ COPY_PATHS: list[tuple[str, str]] = [
     ("models/gat_informer/README.md", "models/gat_informer/README.md"),
     # --- light results (tables + paper figures) ---
     ("results/comparison/zone_2/all_models/tables", "results/comparison/zone_2/all_models/tables"),
+    ("results/comparison/zone_2/all_models/figures", "results/comparison/zone_2/all_models/figures"),
     ("results/comparison/zone_2/seq_len_sensitivity", "results/comparison/zone_2/seq_len_sensitivity"),
     ("results/comparison/zone_2/horizon_48", "results/comparison/zone_2/horizon_48"),
     ("results/README.md", "results/README.md"),
-    ("docs/figures_print", "docs/figures_print"),
-    ("docs/tfm_manuscript_overleaf.tex", "docs/tfm_manuscript_overleaf.tex"),
-    ("docs/tfm_manuscript_overleaf_v02.tex", "docs/tfm_manuscript_overleaf_v02.tex"),
-    ("docs/biblio.bib", "docs/biblio.bib"),
     # --- dartboard / graph artefacts (tiny) ---
     (
         "src/models/airformer/_upstream/data/local_partition/zone2_18",
@@ -345,8 +343,7 @@ cd ../../..
 | `src/` | Training, models, comparison metrics |
 | `analysis/comparison/` | Paper figures |
 | `results/comparison/zone_2/**/tables` | Metric tables (incl. lead-time & exceedance) |
-| `docs/figures_print/` | Final PNGs for the manuscript |
-| `docs/tfm_manuscript_overleaf_v02.tex` | **Latest** manuscript source (v02) |
+| `analysis/comparison/` + `results/comparison/zone_2/**/figures` | Paper figures (regenerable) |
 | `results/comparison/zone_2/horizon_48/` | H=24 vs H=48 comparison tables |
 | `results/airformer/zone_2/ZONE2_PM10/F*_mse/` | MSE loss sensitivity (AirFormer) |
 
@@ -399,16 +396,14 @@ def write_reviewer(dest_root: Path) -> None:
 
 ## Start here
 
-1. **Manuscript (latest):** `docs/tfm_manuscript_overleaf_v02.tex`
-2. **Figures in the PDF:** `docs/figures_print/` (incl. `fig_lead_rmse_hit_headline.png`)
-3. **Tables backing Results:** `results/comparison/zone_2/all_models/tables/`
-4. **Protocol:** `configs/bajo_nervion_pm10.yaml`
+1. **Tables backing Results:** `results/comparison/zone_2/all_models/tables/`
+2. **Figures:** `results/comparison/zone_2/all_models/figures/` (regenerate with scripts below)
+3. **Protocol:** `configs/bajo_nervion_pm10.yaml`
 
 ## Key supplementary analyses
 
 | Topic | Where |
 |-------|-------|
-| Manuscript v02 (recortes + MSE + Saharan gap + lead-time) | `docs/tfm_manuscript_overleaf_v02.tex` |
 | Loss-function check (AirFormer MAE vs MSE) | `results/airformer/zone_2/ZONE2_PM10/F*_mse/` |
 | Supplementary horizon H=48 | `results/comparison/zone_2/horizon_48/`, `configs/horizon_48.yaml` |
 | Look-back sensitivity L∈{{24,48,72,96}} | `results/comparison/zone_2/seq_len_sensitivity/` |
@@ -433,29 +428,6 @@ Full tensor caches and checkpoints are **not** shipped (rebuild from CSV).
 """,
         encoding="utf-8",
     )
-
-
-def patch_manuscript_github_url(dest_root: Path) -> None:
-    """Point manuscript availability sentence to this repository."""
-    tex = dest_root / "docs" / "tfm_manuscript_overleaf_v02.tex"
-    if not tex.exists():
-        return
-    text = tex.read_text(encoding="utf-8")
-    old_urls = [
-        "https://github.com/apadroh/tfm-pm10-bajo-nervion-repro",
-        "https://github.com/apadroh/2026_FPD_Ales_Padro_Bajo_Nervion",
-    ]
-    for old in old_urls:
-        text = text.replace(old, GITHUB_URL)
-    text = text.replace(
-        "definitive zone-2 PM$_{10}$ dataset",
-        "definitive Bajo Nervi\\'on PM$_{10}$ dataset",
-    )
-    text = text.replace(
-        "definitive zone-2 PM$_{10}$ dataset",
-        "definitive Bajo Nervi\\'on PM$_{10}$ dataset",
-    )
-    tex.write_text(text, encoding="utf-8")
 
 
 def main() -> None:
@@ -488,7 +460,6 @@ def main() -> None:
     write_data_readme(dest)
     write_readme(dest)
     write_reviewer(dest)
-    patch_manuscript_github_url(dest)
 
     shutil.copy2(Path(__file__), dest / "scripts" / "export_repro_package.py")
 

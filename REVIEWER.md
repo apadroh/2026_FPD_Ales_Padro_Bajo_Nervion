@@ -4,16 +4,14 @@
 
 ## Start here
 
-1. **Manuscript (latest):** `docs/tfm_manuscript_overleaf_v02.tex`
-2. **Figures in the PDF:** `docs/figures_print/` (incl. `fig_lead_rmse_hit_headline.png`)
-3. **Tables backing Results:** `results/comparison/zone_2/all_models/tables/`
-4. **Protocol:** `configs/bajo_nervion_pm10.yaml`
+1. **Tables backing Results:** `results/comparison/zone_2/all_models/tables/`
+2. **Figures:** `results/comparison/zone_2/all_models/figures/` (regenerate with scripts below)
+3. **Protocol:** `configs/bajo_nervion_pm10.yaml`
 
 ## Key supplementary analyses
 
 | Topic | Where |
 |-------|-------|
-| Manuscript v02 (recortes + MSE + Saharan gap + lead-time) | `docs/tfm_manuscript_overleaf_v02.tex` |
 | Loss-function check (AirFormer MAE vs MSE) | `results/airformer/zone_2/ZONE2_PM10/F*_mse/` |
 | Supplementary horizon H=48 | `results/comparison/zone_2/horizon_48/`, `configs/horizon_48.yaml` |
 | Look-back sensitivity L∈{24,48,72,96} | `results/comparison/zone_2/seq_len_sensitivity/` |
